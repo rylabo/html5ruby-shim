@@ -1,0 +1,58 @@
+/* Simplified version of http://www.useragentman.com/blog/2010/10/29/cross-browser-html5-ruby-annotations-using-css/
+for use with Modernizr.load() */
+
+ruby {
+display: inline-table;
+text-align: center;
+border-collapse: collapse;
+border: none;
+vertical-align: middle;
+border-bottom: solid 0.75em transparent;
+}
+
+ruby > rt,
+rtc {
+display: table-header-group;
+}
+
+ruby > rb,
+rbc,
+ruby > rt + rt,
+rtc + rtc {
+display: table-row;
+}
+
+ruby > rt + rt,
+rtc + rtc {
+border-bottom: hidden;
+}
+
+rb,
+rbc,
+rt,
+rtc {
+white-space: nowrap;
+}
+
+rtc > rt,
+rbc > rb {
+display: table-cell;
+}
+
+rtc > rt[rbspan] {
+column-span: attr(rbspan);
+}
+
+ruby > rt,
+rtc {
+font-size: 0.5em;
+line-height: 1.2em;
+}
+
+rp {
+display: none;
+}
+
+ruby {
+ruby-align: center;
+}

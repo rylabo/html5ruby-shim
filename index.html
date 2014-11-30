@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="jp">
+	<head>
+		<meta charset="utf-8">
+        <meta http-equiv="Content-type" content="text/html;charset=UTF-8">
+		<meta http-equiv="X-UA-Compatible" content="IE=edge">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+        <link href="/src/css/ruby-polyfill.css" rel="stylesheet" />
+        <script src="lib/js/html5shiv.js" type="text/javascript"></script>
+    <!--    <style>
+        /* Simplified version of http://www.useragentman.com/blog/2010/10/29/cross-browser-html5-ruby-annotations-using-css/
+        for use with Modernizr.load() */
+
+        ruby {
+        display: inline-table;
+        text-align: center;
+        border-collapse: collapse;
+        border: none;
+        vertical-align: middle;
+        border-bottom: solid 0.75em transparent;
+        }
+
+        ruby > rt,
+        rtc {
+        display: table-header-group;
+        }
+
+        ruby > rb,
+        rbc,
+        ruby > rt + rt,
+        rtc + rtc {
+        display: table-row;
+        }
+
+        ruby > rt + rt,
+        rtc + rtc {
+        border-bottom: hidden;
+        }
+
+        rb,
+        rbc,
+        rt,
+        rtc {
+        white-space: nowrap;
+        }
+
+        rtc > rt,
+        rbc > rb {
+        display: table-cell;
+        }
+
+        rtc > rt[rbspan] {
+        column-span: attr(rbspan);
+        }
+
+        ruby > rt,
+        rtc {
+        font-size: 0.5em;
+        line-height: 1.2em;
+        }
+
+        rp {
+        display: none;
+        }
+
+        ruby {
+        ruby-align: center;
+        }
+        </style> -->
+    </head>
+    <body>
+        <div id="rubybox">
+        </div>
+        <div id="treebox">
+        </div>
+        <script type="text/javascript">
+            function testRuby(){
+                var tbox = document.getElementById("treebox"),
+                    rbox = document.getElementById("rubybox"),
+                    content = "<ruby>&#13;&#10" +
+                    "<rbc>&#13;&#10<rb>五十</rb><rb>四</rb><rb>歩</rb></rbc>" +
+                    "<rtc><rt>ゴジュ－</rt><rt>シ</rt><rt>ホ</rt></rtc>" +
+                    "<rtc></rtc>" +
+                    "</ruby>",
+                    rubyContent;
+                rbox.innerHTML = content;
+                var rubyContent = rbox.getElementsByTagName('ruby')[0].getElementsByTagName('rtc')[0];
+                if (!rubyContent.getElementsByTagName('rt')[0]){
+                    return false;
+                }
+                return true;
+            }
+            var val = testRuby();
+            var rstr = val + "content: " + document.getElementById("rubybox").innerHTML;
+            window.alert(rstr);
+        </script>
+    </body>
+</html>
