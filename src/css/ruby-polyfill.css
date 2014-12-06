@@ -10,14 +10,16 @@ vertical-align: middle;
 border-bottom: solid 0.75em transparent;
 }
 
+ruby > rt {
+    text-align: center;
+}
+
 ruby > rt,
 rtc {
 display: table-header-group;
 }
 
-ruby > rb,
 rbc,
-ruby > rt + rt,
 rtc + rtc {
 display: table-row;
 }
@@ -34,6 +36,7 @@ rtc {
 white-space: nowrap;
 }
 
+ruby > rb,
 rtc > rt,
 rbc > rb {
 display: table-cell;
@@ -44,7 +47,7 @@ column-span: attr(rbspan);
 }
 
 ruby > rt,
-rtc {
+rtc > rt {
 font-size: 0.5em;
 line-height: 1.2em;
 }
