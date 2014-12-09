@@ -5,6 +5,7 @@
         RubyPreprocessor = {},
         RubyShim = {},
         rubyNode,
+        rubyChildren,
         ns,
         i;
 
@@ -85,7 +86,10 @@
         }
         return rubyNode;
     };
-    rubyNode = document.getElementsByTagName("ruby")[0];
-    rubyNode = RubyPreprocessor.preprocess(rubyNode);
+    rubyChildren = document.getElementsByTagName("ruby");
+    for (i = 0; i < rubyChildren.length; i++) {
+        rubyNode = document.getElementsByTagName("ruby")[i];
+        rubyNode = RubyPreprocessor.preprocess(rubyNode);
+    }
     }()
 );
