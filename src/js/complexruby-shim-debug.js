@@ -9,25 +9,89 @@
         ns,
         i;
 
-    RubyShim.reconstructNode = function (DOMelement, tagName) {
+    RubyShim.nextNonWhitespaceSibling = function (subNode) {
+        if (subNode.nextSibling && RubyChildAnalyzer.isWhitespaceNode(subNode.nextSibling)) {
+            return RubyShim.nextNonWhitespaceSibling(subNode.nextSibling);
+        }
+        // else
+        return subNode.nextSibling;
     };
+
+    RubyShim.wrapChildWithNewElement = function (child, newElementTag) {
+        var newNode = document.createElement("rb");
+        newNode.appendChild(child);
+        return newNode;
+    };
+
+    RubyShim.wrapChildInNewElementAndPrepend = function (rubyNode, child, newElementTag) {
+        var newNode = RubyShim.wrapChildWithNewElement(child, newElementTag);
+        rubyNode.insertBefore(newNode, rubyNode.firstChild);
+        return rubyNode;
+    };
+
+    RubyShim.buildNewTextContainerNode = function (child) {
+        var newNode = document.createElement("rtc");
+        while (RubyShim.nextNonWhitespaceSibling(child) &&
+                RubyShim.nextNonWhitespaceSibling(child).tagName.toLowerCase() === "rt") {
+            newNode.appendChild(RubyShim.nextNonWhitespaceSibling(child));
+        }
+        return newNode;
+    };
+
+    RubyShim.appendToContainerNode = function (rubyNode, containerNode, child) {
+        var nextChild, newNode;
+        if (!child) {
+            return containerNode;
+        }
+        nextChild = RubyShim.nextNonWhitespaceSibling(child);
+        if (RubyChildAnalyzer.isNonEmptyBaseNode(child)) {
+            containerNode.appendChild(child);
+        } else if (RubyChildAnalyzer.isEmptyBaseNodeThenTextNode(child)) {
+            // we eventually need to pull the loose empty base nodes from the ruby node
+            newNode = RubyShim.wrapChildWithNewElement(RubyShim.nextNonWhitespaceSibling(child), "rb");
+            nextChild = RubyShim.nextNonWhitespaceSibling(child);
+            rubyNode.removeChild(child);
+            containerNode.appendChild(newNode);
+        } else if ((child.tagName.toLowerCase() === "rt") ||
+                        (child.tagName.toLowerCase() === "rtc") ||
+                        (child.tagName.toLowerCase() === "rp")) {
+            return containerNode;
+        }
+        return RubyShim.appendToContainerNode(rubyNode, containerNode, nextChild);
+    };
+
+    RubyShim.buildNewBaseContainerNode = function (rubyNode, child) {
+        var newNode = document.createElement("rbc"),
+            nextChild = RubyShim.nextNonWhitespaceSibling(child);
+        if (RubyChildAnalyzer.isTextNode(nextChild)) {
+            newNode.appendChild(RubyShim.wrapChildWithNewElement(nextChild, "rb"));
+        }
+        return RubyShim.appendToContainerNode(rubyNode, newNode, nextChild);
+    };
+
     RubyChildAnalyzer.isTextNode = function (DOMelement) {
-        return DOMelement.nodeType === 3 && !(/^[\t\n\r ]+$/.test(DOMelement.textContent));
+        return DOMelement.nodeType === 3 && !(/^[\t\n\r ]+$/.test(DOMelement.nodeValue));
     };
     RubyChildAnalyzer.isWhitespaceNode = function (DOMelement) {
-        return DOMelement.nodeType === 3 && (/^[\t\n\r ]+$/.test(DOMelement.textContent));
+        return DOMelement.nodeType === 3 && (/^[\t\n\r ]+$/.test(DOMelement.nodeValue));
     };
     RubyChildAnalyzer.isEmptyBaseContainerNode = function (DOMelement) {
         return (DOMelement.nodeType !== 3) &&
             (DOMelement.tagName.toLowerCase() === "rbc") &&
             (DOMelement.childNodes.length === 0);
     };
+    RubyChildAnalyzer.isNonEmptyBaseNode = function (DOMelement) {
+        // tests to see if the base node is empty but followed by a loose text node
+        return (DOMelement.nodeType !== 3) &&
+            (DOMelement.tagName.toLowerCase() === "rb") &&
+            (DOMelement.childNodes.length !== 0);
+    };
     RubyChildAnalyzer.isEmptyBaseNodeThenTextNode = function (DOMelement) {
         // tests to see if the base node is empty but followed by a loose text node
         return (DOMelement.nodeType !== 3) &&
             (DOMelement.tagName.toLowerCase() === "rb") &&
             (DOMelement.childNodes.length === 0) &&
-            (DOMelement.nextSibling.nodeType === 3);
+            (RubyShim.nextNonWhitespaceSibling(DOMelement).nodeType === 3);
     };
     RubyChildAnalyzer.isBadIE8ClosingTagNode = function (DOMelement) {
         // IE8 mishandles rb and rtc tags when reading HTML, creating empty RB nodes and empty nodes tagged "/RB"
@@ -47,39 +111,27 @@
         // checks for the lack of a certain type of node.
     };
 
-    RubyPreprocessor.nextNonWhitespaceSibling = function (subNode) {
-        if (subNode.nextSibling && RubyChildAnalyzer.isWhitespaceNode(subNode.nextSibling)) {
-            return RubyPreprocessor.nextNonWhitespaceSibling(subNode.nextSibling);
-        }
-        // else
-        return subNode.nextSibling;
-    };
     RubyPreprocessor.preprocess = function (rubyNode) {
         var children = rubyNode.childNodes,
-            child,
             newNode,
             i;
         for (i = 0; i < children.length; i++) {
-            child = children.item(i);
-            if (RubyChildAnalyzer.isTextNode(child) && (i === 0)) {
+            if (RubyChildAnalyzer.isTextNode(children.item(i)) && (i === 0)) {
                 // implicit rb node
-                newNode = document.createElement("rb");
-                newNode.appendChild(child);
-                rubyNode.replaceChild(newNode, children.item(i));
-            } else if (RubyChildAnalyzer.isEmptyBaseNodeThenTextNode(child)) {
-                // empty rb node followed by a text node.. semantically an rb node
-                newNode = document.createElement("rb");
-                newNode.appendChild(child.nextSibling);
-                rubyNode.replaceChild(newNode, children.item(i));
-            } else if (RubyChildAnalyzer.isEmptyTextContainerNode(child)) {
+                newNode = RubyShim.wrapChildWithNewElement(children.item(i), "rb");
+                rubyNode.insertBefore(newNode, rubyNode.firstChild);
+            } else if (RubyChildAnalyzer.isEmptyBaseNodeThenTextNode(children.item(i))) {
+                newNode = RubyShim.wrapChildWithNewElement(RubyShim.nextNonWhitespaceSibling(children.item(i)), "rb");
+                rubyNode.replaceChild(newNode, children.item(i)); //write over current rb node
+            } else if (RubyChildAnalyzer.isEmptyTextContainerNode(children.item(i))) {
                 // empty rtc node, could be legitimately empty, or could be followed by rt nodes.
-                newNode = document.createElement("rtc");
-                while (RubyPreprocessor.nextNonWhitespaceSibling(child) &&
-                        RubyPreprocessor.nextNonWhitespaceSibling(child).tagName.toLowerCase() === "rt") {
-                    newNode.appendChild(RubyPreprocessor.nextNonWhitespaceSibling(child));
-                }
+                newNode = RubyShim.buildNewTextContainerNode(children.item(i));
                 rubyNode.replaceChild(newNode, children.item(i));
-            } else if (RubyChildAnalyzer.isBadIE8ClosingTagNode(child)) {
+            } else if (RubyChildAnalyzer.isEmptyBaseContainerNode(children.item(i))) {
+                // empty rtc node, could be legitimately empty, or could be followed by rt nodes.
+                newNode = RubyShim.buildNewBaseContainerNode(rubyNode, children.item(i));
+                rubyNode.replaceChild(newNode, children.item(i));
+            } else if (RubyChildAnalyzer.isBadIE8ClosingTagNode(children.item(i))) {
                 rubyNode.removeChild(children.item(i));
                 i--;
             }
