@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="jp">
+	<head>
+		<meta charset="utf-8">
+        <meta http-equiv="Content-type" content="text/html;charset=UTF-8">
+		<meta http-equiv="X-UA-Compatible" content="IE=edge">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+        <link href="/src/css/ruby-polyfill.css" rel="stylesheet">
+        <link href="/test/css/test.css" rel="stylesheet">
+    </head>
+    <body>
+        <div>
+            <h1>HTML5 Ruby Element Rendering Test Page</h1>
+        </div>
+        <div>
+            <h2>Rendering Tests for Ruby Element in HTML Source</h2>
+            <div>
+                <h3>Stylability Tests</h3>
+                <div class="ruby-base-styling-tests">
+                    <h4>Ruby Base Stylability</h4>
+                    <p>These tests pass if all the capital letters and only the capital letters have a blue background.</p>
+                    <div id="ruby-styling-001">
+                        <h5>Test 001</h5>
+                        <ruby><rb>A</rb><rt>aaa</rt><rb>B</rb><rt>bb</rt><rb>C</rb><rt>cc</rt><rb>D</rb><rt>d</rt></ruby>...
+                    </div>
+                    <div id="ruby-styling-003">
+                        <h5>Test 003</h5>
+                        <ruby><rb>A<rt>aaa<rb>B<rt>bb<rb>C<rt>cc<rb>D<rt>d</ruby>...
+                    </div>
+                    <div id="ruby-styling-004">
+                        <h5>Test 004</h5>
+                        <ruby><rb>A</rb><rb>B</rb><rb>C</rb><rb>D</rb><rt>aaa</rt><rt>bb</rt><rt>cc</rt><rt>d</rt></ruby>...
+                    </div>
+                    <div id="ruby-styling-005">
+                        <h5>Test 005</h5>
+                        <ruby><rb>A<rb>B<rb>C<rb>D<rt>aaa<rt>bb<rt>cc<rt>d</ruby>...
+                    </div>
+                </div>
+                <div class="ruby-text-styling-tests">
+                    <h4>Ruby Text Stylability</h4>
+                    <p>These tests pass if all the lowercase letters and only the lowercase letters have a blue background.</p>
+                    <div id="ruby-styling-006">
+                        <h5>Test 006</h5>
+                        <ruby><rb>A</rb><rt>aaa</rt><rb>B</rb><rt>bb</rt><rb>C</rb><rt>cc</rt><rb>D</rb><rt>d</rt></ruby>...
+                    </div>
+                    <div id="ruby-styling-007">
+                        <h5>Test 007</h5>
+                        <ruby><rb>A<rt>aaa<rb>B<rt>bb<rb>C<rt>cc<rb>D<rt>d</ruby>...
+                    </div>
+                    <div id="ruby-styling-008">
+                        <h5>Test 008</h5>
+                        <ruby><rb>A</rb><rb>B</rb><rb>C</rb><rb>D</rb><rt>aaa</rt><rt>bb</rt><rt>cc</rt><rt>d</rt></ruby>...
+                    </div>
+                    <div id="ruby-styling-009">
+                        <h5>Test 009</h5>
+                        <ruby><rb>A<rb>B<rb>C<rb>D<rt>aaa<rt>bb<rt>cc<rt>d</ruby>...
+                    </div>
+                </div>
+                <div class="ruby-embedded-span-styling-tests">
+                    <h4>Span Stylability</h4>
+                    <div id="ruby-styling-010">
+                        <h5>Test 010</h5>
+                        <p>This test passes if only the uppercase 'B' is highlighted.</p>
+                        <ruby><rb>A<span>B</span>CD</rb><rt>aaabbccd</rt></ruby>...
+                    </div>
+                    <div id="ruby-styling-011">
+                        <h5>Test 011</h5>
+                        <p>This test passes if only the lowercase 'x' is highlighted.</p>
+                        <ruby><rb>A</rb><rt>a<span>x</span>a</rt><rb>B</rb><rt>bb</rt></ruby>...
+                    </div>
+                </div>
+            </div>
+            <div>
+                <h3>Positioning Tests for a single set of Ruby Texts</h3>
+                <p>These tests pass if these conditions are met:
+                    <ul>
+                        <li>Each lowercase letter is positioned above its corresponding uppercase letter</li>
+                        <li>The lowercase letters appear in a smaller font than the uppercase letters</li>
+                        <li>All uppercase letters are aligned horizontally with no gaps in between</li>
+                        <li>All lowercase letters are aligned horizontally</li>
+                        <li>The uppercase letters are align horizontally with the trailing periods</li>
+                    </ul>
+                </p>
+                <div id="ruby-position-001">
+                    <h5>Test 001</h5>
+                    <ruby><rb>A</rb><rt>aaa</rt><rb>B</rb><rt>bb</rt><rb>C</rb><rt>cc</rt><rb>D</rb><rt>d</rt></ruby>...
+                </div>
+                <div id="ruby-position-002">
+                    <h5>Test 002</h5>
+                    <ruby>A<rt>aaa</rt>B<rt>bb</rt>C<rt>cc</rt>D<rt>d</rt></ruby>...
+                </div>
+                <div id="ruby-position-003">
+                    <h5>Test 003</h5>
+                    <ruby><rb>A<rt>aaa<rb>B<rt>bb<rb>C<rt>cc<rb>D<rt>d</ruby>...
+                </div>
+                <div id="ruby-position-004">
+                    <h5>Test 004</h5>
+                    <ruby><rb>A</rb><rb>B</rb><rb>C</rb><rb>D</rb><rt>aaa</rt><rt>bb</rt><rt>cc</rt><rt>d</rt></ruby>...
+                </div>
+                <div id="ruby-position-005">
+                    <h5>Test 005</h5>
+                    <ruby><rb>A<rb>B<rb>C<rb>D<rt>aaa<rt>bb<rt>cc<rt>d</ruby>...
+                </div>
+            </div>
+            <div>
+                <h3>Positioning Tests for two sets of Ruby Texts</h3>
+                <div id="ruby-double-001">
+                    <h5>Test 001</h5>
+                    <ruby><rb>A</rb><rb>B</rb><rb>C</rb><rb>D</rb><rt>aaa</rt><rt>bb</rt><rt>cc</rt><rt>d</rt><rtc><rt>111</rt><rt>22</rt><rt>33</rt><rt>4</rt></rtc></ruby>...
+                </div>
+                <div id="ruby-double-002">
+                    <h5>Test 002</h5>
+                    <ruby><rb>A</rb><rb>B</rb><rb>C</rb><rb>D</rb><rtc><rt>aaa</rt><rt>bb</rt><rt>cc</rt><rt>d</rt></rtc><rtc><rt>111</rt><rt>22</rt><rt>33</rt><rt>4</rt></rtc></ruby>...
+                </div>
+                <div id="ruby-double-003">
+                    <h5>Test 003</h5>
+                    <ruby><rb>A</rb><rb>B</rb><rb>C</rb><rb>D</rb><rt>aaa</rt><rt>bb</rt><rt>cc</rt><rt>d</rt><rtc>11122334</rtc></ruby>...
+                </div>
+                <div id="ruby-double-004">
+                    <h5>Test 004</h5>
+                    <ruby><rb>A</rb><rb>B</rb><rb>C</rb><rb>D</rb><rtc><rt>aaa</rt><rt>bb</rt><rt>cc</rt><rt>d</rt></rtc><rtc>11122334</rtc></ruby>...
+                </div>
+                <div id="ruby-double-005">
+                    <h5>Test 005</h5>
+                    <ruby><rb>A</rb><rb>B</rb><rb>C</rb><rb>D</rb><rt>11122334</rt><rtc><rt>aaa</rt><rt>bb</rt><rt>cc</rt><rt>d</rt></rtc></ruby>...
+                </div>
+                <div id="ruby-double-006">
+                    <h5>Test 006</h5>
+                    <ruby><rb>A</rb><rb>B</rb><rb>C</rb><rb>D</rb><rtc>11122334</rtc><rtc><rt>aaa</rt><rt>bb</rt><rt>cc</rt><rt>d</rt></rtc></ruby>...
+                </div>
+                <div id="ruby-double-007">
+                    <h5>Test 007</h5>
+                    <ruby><ruby><rb>A</rb><rt>aaa</rt><rb>B</rb><rt>bb</rt><rb>C</rb><rt>cc</rt><rb>D</rb><rt>d</rt></ruby><rt>11122334</rt></ruby>...
+                </div>
+                <div id="ruby-double-008">
+                    <h5>Test 008</h5>
+                    <ruby><rb>A</rb><rt>aaa</rt><rtc>111</rtc><rb>B</rb><rt>bb</rt><rtc>22</rtc><rb>C</rb><rt>cc</rt><rtc>33</rtc><rb>D</rb><rt>d</rt><rtc>4</rtc></ruby>
+                </div>
+            </div>
+            <div>
+                <h3>Positioning of Ruby Text with Gaps</h3>
+                <div id="ruby-gap-001">
+                    <h5>Test 001</h5>
+                    <ruby><rb>A</rb><rt>aaa</rt><rb>B</rb><rt></rt><rb>C</rb><rt>cc</rt><rb>D</rb><rt>d</rt></ruby>...
+                </div>
+                <div id="ruby-gap-002">
+                    <h5>Test 002</h5>
+                    <ruby><rb>A</rb><rb>B</rb><rb>C</rb><rb>D</rb><rt>aaa</rt><rt></rt><rt>cc</rt><rt>d</rt></ruby>...
+                </div>
+            </div>
+        </div>
+    </body>
+    <script src="/src/js/complexruby-shim-debug.js" type="text/javascript"></script>
+</html>

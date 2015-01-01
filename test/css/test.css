@@ -1,0 +1,7 @@
+.ruby-base-styling-tests rb,
+.ruby-text-styling-tests rt,
+.ruby-embedded-span-styling-tests span
+{
+    background-color: #39f; color: white;
+}
+
