@@ -24,11 +24,6 @@ rtc + rtc {
 display: table-row;
 }
 
-ruby > rt + rt,
-rtc + rtc {
-border-bottom: hidden;
-}
-
 rb,
 rbc,
 rt,
