@@ -1,11 +1,15 @@
-/*jslint plusplus: true */
+/*jslint plusplus: true, continue: true, debug: true */
+/*global console */
 
 (function () { "use strict";
     var RubyChildAnalyzer = {},
         RubyPreprocessor = {},
         RubyShim = {},
+        RTCNodeProcessor = {},
+        RubyProcessor = {},
         rubyNode,
         rubyChildren,
+        rubySegs,
         ns,
         i;
 
@@ -111,6 +115,213 @@
             }
         }
 
+    };
+
+    // RTC Node Processor Definition
+
+    RTCNodeProcessor = function (rtcNode) {
+        this.root = rtcNode;
+        this.annotations = [];
+        this.currentAutomaticAnnotationNodes = [];
+        this.currentAutomaticAnnotationRangeStart = null;
+        this.children = this.root.childNodes;
+
+        this.commitAutomaticAnnotation = function (index) {
+            if (this.currentAutomaticAnnotationNodes.length === 0) {
+                return;
+            }
+            for (i = 0; i < this.currentAutomaticAnnotationNodes.length; i++) {
+                if (!RubyChildAnalyzer.isEmptyTextContainerNode(this.currentAutomaticAnnotationNodes[i])) {
+                    this.annotations = this.annotations.concat(this.currentAutomaticAnnotationNodes);
+                    break;
+                }
+            }
+
+            this.currentAutomaticAnnotationNodes = [];
+            this.currentAutomaticAnnotationRangeStart = null;
+        };
+
+        var currentChild, i;
+        for (i = 0; i < this.children.length; i++) {
+            currentChild = this.children.item(i);
+            // TODO code rest of construction code
+            if (RubyChildAnalyzer.isElementWithTag(currentChild, "rt")) {
+                this.commitAutomaticAnnotation(i);
+                this.annotations.push(currentChild);
+                continue;
+            }
+            if (this.currentAutomaticAnnotationNodes.length === 0) {
+                this.currentAutomaticAnnotationRangeStart = i;
+            }
+            this.currentAutomaticAnnotationNodes.push(currentChild);
+        }
+
+    }; // end of RTC Node Processor Definition
+
+    RTCNodeProcessor.getDescriptor = function (rtcNode) {
+        var rtcProcessor = new RTCNodeProcessor(rtcNode);
+        return rtcProcessor.annotations;
+    };
+
+    // Ruby Processor Definition
+    RubyProcessor = function (rubyNode) {
+        this.root = rubyNode;
+        this.rubySegments = [];
+        this.currentBases = [];
+        this.currentBasesRange = null;
+        this.currentBasesRangeStart = null;
+        this.currentAnnotations = [];
+        this.currentAnnotationsRange = null;
+        this.currentAnnotationsRangeStart = null;
+        this.currentAnnotationContainers = [];
+        this.currentAutomaticBaseRangeStart = null;
+        this.currentAutomaticBaseNodes = [];
+        this.children = this.root.childNodes;
+
+        this.commitRubySegment = function (index) {
+            this.commitAutomaticBase(index);
+            if ((this.currentBases.length === 0) &&
+                    (this.currentAnnotations.length === 0) &&
+                    (this.currentAnnotationContainers.length === 0)) {
+                return;
+            }
+            this.commitBaseRange(index);
+            this.commitCurrentAnnotations(index);
+            this.rubySegments.push({bases : this.currentBases,
+                                    baseRange : this.currentBasesRange,
+                                    annotationContainers : this.currentAnnotationContainers
+                                   });
+            this.currentBases = [];
+            this.currentBasesRange = null;
+            this.currentBasesRangeStart = null;
+            this.currentAnnotationContainers = [];
+        };
+
+        this.commitAutomaticBase = function (index) {
+            var i, j;
+            if (this.currentAutomaticBaseNodes.length === 0) {
+                return;
+            }
+            for (i = 0; i < this.currentAutomaticBaseNodes.length; i++) {
+                if (!RubyChildAnalyzer.isEmptyTextContainerNode(this.currentAutomaticBaseNodes[i])) {
+                    if (this.currentBases.length === 0) {
+                        this.currentBaseRangeStart = this.currentAutomaticBaseRangeStart;
+                    }
+                    break;
+                }
+            }
+            this.currentBases = this.currentBases.concat(this.currentAutomaticBaseNodes);
+            this.currentAutomaticBaseNodes = [];
+            this.currentAutomaticBaseRangeStart = null;
+        };
+
+        this.commitBaseRange = function (index) {
+            if ((this.currentBases.length === 0) || !this.currentBasesRange) {
+                return;
+            }
+            this.currentBasesRange = {start: this.currentBasesRangeStart, end: index};
+        };
+
+        this.commitCurrentAnnotations = function (index) {
+            if ((this.currentAnnotations.length !== 0) && !this.currentAnnotationsRange) {
+                this.currentAnnotationsRange = {start: this.currentAnnotationsRangeStart, end: index};
+            }
+            if (this.currentAnnotations.length !== 0) {
+                this.currentAnnotationContainers.push({annotationList: this.currentAnnotations, range: this.currentAnnotationsRange});
+            }
+
+            this.currentAnnotations = [];
+            this.currentAnnotationsRange = null;
+            this.currentAnnotationsRangeStart = null;
+        };
+
+        // construction code
+
+        var currentChild, lookaheadIndex, peekChild, loops = 0, i;
+        // debugger;
+        for (i = 0; i < this.children.length; i++) {
+            loops += 1;
+/*
+            if (loops > 100) {
+                debugger;
+            }
+*/
+            currentChild = this.children.item(i);
+            if ((currentChild.nodeType !== 1) && (currentChild.nodeType !== 3)) {
+                continue;
+            }
+
+            if (RubyChildAnalyzer.isElementWithTag(currentChild, "rp")) {
+                continue;
+            }
+
+            if (RubyChildAnalyzer.isElementWithTag(currentChild, "rt")) {
+                this.commitAutomaticBase(i);
+                this.commitBaseRange(i);
+                if (this.currentAnnotations.length === 0) {
+                    this.currentAnnotationsRangeStart = i;
+                }
+                this.currentAnnotations.push(currentChild);
+                continue;
+            }
+
+            if (RubyChildAnalyzer.isElementWithTag(currentChild, "rtc")) {
+                this.commitAutomaticBase(i);
+                this.commitBaseRange(i);
+                this.commitCurrentAnnotations(i);
+                this.currentAnnotationContainers.push({annotationList: RTCNodeProcessor.getDescriptor(currentChild),
+                                                       range: {start: i, end: i + 1}});
+                continue;
+            }
+
+            if (RubyChildAnalyzer.isEmptyTextContainerNode(currentChild)) {
+                if (this.currentAnnotations.length !== 0) {
+                    continue;
+                }
+
+                lookaheadIndex = i + 1;
+                peekChild = this.children.item(lookaheadIndex);
+                while (lookaheadIndex < this.children.length && peekChild && RubyChildAnalyzer.isEmptyTextContainerNode(peekChild)) {
+                    lookaheadIndex += 1;
+                    peekChild = this.children.item(lookaheadIndex);
+                }
+                if (RubyChildAnalyzer.isElementWithTag(peekChild, "rt") ||
+                        RubyChildAnalyzer.isElementWithTag(peekChild, "rtc") ||
+                        RubyChildAnalyzer.isElementWithTag(peekChild, "rp")) {
+                    i = lookaheadIndex - 1;
+                    continue;
+                }
+            }
+
+            if ((this.currentAnnotations.length !== 0) ||
+                    (this.currentAnnotationContainers.length !== 0)) {
+                this.commitRubySegment(i);
+            }
+
+            if (RubyChildAnalyzer.isElementWithTag(currentChild, "rb")) {
+                this.commitAutomaticBase(i);
+                if (this.currentBases.length === 0) {
+                    this.currentBasesRangeStart = i;
+                }
+                this.currentBases.push(currentChild);
+                continue;
+            }
+
+            if (this.currentAutomaticBaseNodes.length === 0) {
+                this.currentAutomaticBaseRangeStart = i;
+            }
+            console.log("pushing child onto bases: " + currentChild);
+            this.currentAutomaticBaseNodes.push(currentChild);
+        } // for
+        this.commitRubySegment(this.children.length);
+        // end construction code
+    }; // end of class def
+
+    RubyProcessor.getDescriptor = function (rubyNode) {
+        var rubyProcessor = new RubyProcessor(rubyNode),
+            rubySegments = rubyProcessor.rubySegments;
+//        rubyProcessor = null;
+        return rubySegments;
     };
 
     RubyChildAnalyzer.isTextNode = function (DOMelement) {
@@ -228,8 +439,9 @@
             (DOMelement.childNodes.length === 0);
     };
 
-    RubyChildAnalyzer.containsNoNodeWithTag = function (tagName) {
-        // checks for the lack of a certain type of node.
+    RubyChildAnalyzer.isElementWithTag = function (DOMelement, tagName) {
+        return (DOMelement.nodeType !== 3) &&
+            (DOMelement.tagName.toLowerCase() === tagName);
     };
 
 
@@ -296,9 +508,17 @@
         return rubyNode;
     };
     rubyChildren = document.getElementsByTagName("ruby");
+//    console.log(rubyChildren);
     for (i = 0; i < rubyChildren.length; i++) {
-        rubyNode = document.getElementsByTagName("ruby")[i];
+        rubyNode = rubyChildren[i];
         rubyNode = RubyPreprocessor.preprocess(rubyNode);
     }
+    console.log(rubyChildren);
+    for (i = 0; i < rubyChildren.length; i++) {
+        rubyNode = rubyChildren[i];
+        rubySegs = RubyProcessor.getDescriptor(rubyNode);
+//        console.log(JSON.stringify(rubySegs));
+    }
+
     }()
 );
