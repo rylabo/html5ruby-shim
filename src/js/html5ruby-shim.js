@@ -7,11 +7,14 @@
         RubyShim = {},
         RTCNodeProcessor = {},
         RubyProcessor = {},
+        SegmentProcessor = {},
         rubyNode,
         rubyChildren,
         rubySegs,
         ns,
-        i;
+        i,
+        j,
+        newRubyNode;
 
     function insertAfter(newNode, referenceNode) {
         referenceNode.parentNode.insertBefore(newNode, referenceNode.nextSibling);
@@ -117,6 +120,153 @@
 
     };
 
+    // Segment Processor Definition
+
+    // two stages... process, and collapse
+    SegmentProcessor.process = function (rubySegment) {
+        // find the max and minimum number of annotations in a container
+        // pad base container of necessary
+        // set ruby span on final annotations in each container
+        var bases = rubySegment.bases,
+            annotationContainers = rubySegment.annotationContainers, // array
+            maxContainerLength,
+            minContainerLength,
+            additionalBasesNeeded,
+            requiredSpan,
+            currentAnnotation,
+            index;
+
+        maxContainerLength = function (containers) {
+            var val = null,
+                index;
+
+            for (index = 0; index < containers.length; index++) {
+                if (!val) {
+                    val = containers[index].annotationList.length;
+                    continue;
+                }
+                if (containers[index].annotationList.length > val) {
+                    val = containers[index].annotationList.length;
+                }
+            }
+            return val;
+        };
+
+        minContainerLength = function (containers) {
+            var val = null,
+                index;
+
+            for (index = 0; index < containers.length; index++) {
+                if (!val) {
+                    val = containers[index].annotationList.length;
+                    continue;
+                }
+                if (containers[index].annotationList.length < val) {
+                    val = containers[index].annotationList.length;
+                }
+            }
+            return val;
+        };
+
+        additionalBasesNeeded = maxContainerLength(annotationContainers) - bases.length;
+
+        for (index = 0; index < additionalBasesNeeded; index++) {
+            rubySegment.bases.push(document.createElement("rb")); // push an empty base node
+        } // now should have a number of bases
+        // TODO make all segments have equal number of annotation containers
+        bases = rubySegment.bases;
+        for (index = 0; index < annotationContainers.length; index++) {
+            requiredSpan = bases.length - annotationContainers[index].annotationList.length + 1;
+            if (requiredSpan > 1) {
+                // set object.style.rbspan =
+                // TODO this doesn't actually work
+                currentAnnotation = annotationContainers[index].annotationList.slice(-1).pop();
+                currentAnnotation.style["column-span"] = requiredSpan;
+            }
+        }
+
+        return rubySegment;
+    };
+    // returns a freshly minted single segment ruby node.
+    SegmentProcessor.collapseIntoNode = function (rubySegments) {
+        var newNode = document.createElement("ruby"),
+            bases = [],
+            annotationContainers = [],
+            index,
+            index2,
+            maxContainers,
+            annotationLevel,
+            maxLevels,
+            neededContainers,
+            fillerAnnotation,
+            newAnnotationNode;
+        // concatenate all ruby base arrays into a single base array, and all same level annotation containers
+        // TODO search through segments to determine the highest annotation level.
+
+        maxContainers = function (rubySegments) {
+            var val = null,
+                index;
+
+            for (index = 0; index < rubySegments.length; index++) {
+                if (!val) {
+                    val = rubySegments[index].annotationContainers.length;
+                    continue;
+                }
+                if (rubySegments[index].annotationContainers.length > val) {
+                    val = rubySegments[index].annotationContainers.length;
+                }
+            }
+            return val;
+        };
+
+        // initialize our annotation containers
+        maxLevels = maxContainers(rubySegments);
+        debugger;
+        for (index = 0; index < maxLevels; index++) {
+            annotationContainers.push({annotationList: [], range : null});
+        }
+
+        // add container fillers into ruby segments if necessary
+        for (index = 0; index < rubySegments.length; index++) {
+            // make sure all segments contain the correct number containers
+            neededContainers = maxLevels - rubySegments[index].annotationContainers.length;
+            for (annotationLevel = rubySegments[index].annotationContainers.length; annotationLevel < maxLevels; annotationLevel++) { //WRONG!
+//                window.alert("creating a filler container");
+                fillerAnnotation = document.createElement("rt");
+                fillerAnnotation.style["column-span"] = rubySegments[index].bases.length;
+                rubySegments[index].annotationContainers.push({annotationList: [], range : null});
+                rubySegments[index].annotationContainers[annotationLevel].annotationList.push(fillerAnnotation);
+            }
+        }
+        // now should have all segments containing the same number of annotation levels
+        for (index = 0; index < rubySegments.length; index++) {
+            bases = bases.concat(rubySegments[index].bases);
+            for (annotationLevel = 0; annotationLevel < rubySegments[index].annotationContainers.length; annotationLevel++) {
+                annotationContainers[annotationLevel].annotationList = annotationContainers[annotationLevel].annotationList.concat(rubySegments[index].annotationContainers[annotationLevel].annotationList);
+            }
+        }
+
+        // post conditions: should have bases containing a giant list of all ruby bases,
+        // and a set of containers. Begin ruby node construction:
+
+        for (index = 0; index < bases.length; index++) {
+            if (RubyChildAnalyzer.isTextNode(bases[index])) {
+                newNode.appendChild(RubyShim.wrapChildWithNewElement(bases[index], "rb"));
+            } else {
+                newNode.appendChild(bases[index]);
+            }
+        }
+        // now create proper annotation container nodes, and append those
+
+        for (index = 0; index < maxLevels; index++) {
+            newAnnotationNode = document.createElement("rtc");
+            for (index2 = 0; index2 < annotationContainers[index].annotationList.length; index2++) {
+                newAnnotationNode.appendChild(annotationContainers[index].annotationList[index2]);
+            }
+            newNode.appendChild(newAnnotationNode);
+        }
+        return newNode;
+    };
     // RTC Node Processor Definition
 
     RTCNodeProcessor = function (rtcNode) {
@@ -136,6 +286,7 @@
                     break;
                 }
             }
+
 
             this.currentAutomaticAnnotationNodes = [];
             this.currentAutomaticAnnotationRangeStart = null;
@@ -310,7 +461,7 @@
             if (this.currentAutomaticBaseNodes.length === 0) {
                 this.currentAutomaticBaseRangeStart = i;
             }
-            console.log("pushing child onto bases: " + currentChild);
+//            console.log("pushing child onto bases: " + currentChild);
             this.currentAutomaticBaseNodes.push(currentChild);
         } // for
         this.commitRubySegment(this.children.length);
@@ -513,10 +664,15 @@
         rubyNode = rubyChildren[i];
         rubyNode = RubyPreprocessor.preprocess(rubyNode);
     }
-    console.log(rubyChildren);
+//    console.log(rubyChildren);
     for (i = 0; i < rubyChildren.length; i++) {
         rubyNode = rubyChildren[i];
         rubySegs = RubyProcessor.getDescriptor(rubyNode);
+        for (j = 0; j < rubySegs.length; j++) {
+            SegmentProcessor.process(rubySegs[j]);
+        }
+        newRubyNode = SegmentProcessor.collapseIntoNode(rubySegs);
+        rubyChildren[i].parentElement.replaceChild(newRubyNode, rubyChildren[i]);
 //        console.log(JSON.stringify(rubySegs));
     }
 
