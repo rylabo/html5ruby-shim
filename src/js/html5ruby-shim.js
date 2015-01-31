@@ -221,7 +221,7 @@
 
         // initialize our annotation containers
         maxLevels = maxContainers(rubySegments);
-        debugger;
+//        debugger;
         for (index = 0; index < maxLevels; index++) {
             annotationContainers.push({annotationList: [], range : null});
         }
@@ -642,6 +642,10 @@
                 rubyNode.insertBefore(newNode, rubyNode.firstChild);
             } else if (RubyChildAnalyzer.isEmptyBaseNodeThenTextNode(children.item(i))) {
                 newNode = RubyShim.wrapChildWithNewElement(RubyShim.nextNonWhitespaceSibling(children.item(i)), "rb");
+//                while () {
+                    // TODO keep adding nodes until you hit a bad end tag, or a whitelisted element type. Types include
+                    // span, a, link,
+//                }
                 rubyNode.replaceChild(newNode, children.item(i)); //write over current rb node
             } else if (RubyChildAnalyzer.isEmptyTextContainerNode(children.item(i))) {
                 // empty rtc node, could be legitimately empty, or could be followed by rt nodes.
