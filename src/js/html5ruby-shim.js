@@ -8,6 +8,8 @@
         RTCNodeProcessor = {},
         RubyProcessor = {},
         SegmentProcessor = {},
+        BaseDescriptor,
+        AnnotationDescriptor,
         rubyNode,
         rubyChildren,
         rubySegs,
@@ -120,6 +122,24 @@
 
     };
 
+    // BaseDescriptor
+    BaseDescriptor = function (baseNode) {
+        this.node = baseNode;
+        this.annotations = [];
+    };
+    BaseDescriptor.prototype.addAnnotation = function (annotationNode) {
+        this.annotations.push(annotationNode);
+    };
+
+    AnnotationDescriptor = function (annotationNode) {
+        this.node = annotationNode;
+        this.span = [];
+    };
+    AnnotationDescriptor.prototype.addSpannedBase = function (baseNode) {
+        this.span.push(baseNode);
+    };
+
+
     // Segment Processor Definition
 
     // two stages... process, and collapse
@@ -134,7 +154,10 @@
             additionalBasesNeeded,
             requiredSpan,
             currentAnnotation,
-            index;
+            index,
+            index2,
+            index3,
+            last;
 
         maxContainerLength = function (containers) {
             var val = null,
@@ -172,16 +195,21 @@
 
         for (index = 0; index < additionalBasesNeeded; index++) {
             rubySegment.bases.push(document.createElement("rb")); // push an empty base node
-        } // now should have a number of bases
-        // TODO make all segments have equal number of annotation containers
+        }
         bases = rubySegment.bases;
+
         for (index = 0; index < annotationContainers.length; index++) {
-            requiredSpan = bases.length - annotationContainers[index].annotationList.length + 1;
-            if (requiredSpan > 1) {
-                // set object.style.rbspan =
-                // TODO this doesn't actually work
-                currentAnnotation = annotationContainers[index].annotationList.slice(-1).pop();
-                currentAnnotation.style["column-span"] = requiredSpan;
+            for (index2 = 0; index2 < bases.length; index2++) {
+                if (index2 >= annotationContainers[index].annotationList.length) {
+                    last = annotationContainers[index].annotationList.length - 1;
+                    for (index3 = index2; index3 < bases.length; index3++) {
+                        bases[index3].addAnnotation(annotationContainers[index].annotationList[last].node);
+                        annotationContainers[index].annotationList[last].addSpannedBase(bases[index3].node);
+                    }
+                    break;
+                }
+                bases[index2].addAnnotation(annotationContainers[index].annotationList[index2].node);
+                annotationContainers[index].annotationList[index2].addSpannedBase(bases[index2].node);
             }
         }
 
@@ -250,10 +278,10 @@
         // and a set of containers. Begin ruby node construction:
 
         for (index = 0; index < bases.length; index++) {
-            if (RubyChildAnalyzer.isTextNode(bases[index])) {
-                newNode.appendChild(RubyShim.wrapChildWithNewElement(bases[index], "rb"));
+            if (RubyChildAnalyzer.isTextNode(bases[index].node)) {
+                newNode.appendChild(RubyShim.wrapChildWithNewElement(bases[index].node, "rb"));
             } else {
-                newNode.appendChild(bases[index]);
+                newNode.appendChild(bases[index].node);
             }
         }
         // now create proper annotation container nodes, and append those
@@ -261,7 +289,7 @@
         for (index = 0; index < maxLevels; index++) {
             newAnnotationNode = document.createElement("rtc");
             for (index2 = 0; index2 < annotationContainers[index].annotationList.length; index2++) {
-                newAnnotationNode.appendChild(annotationContainers[index].annotationList[index2]);
+                newAnnotationNode.appendChild(annotationContainers[index].annotationList[index2].node);
             }
             newNode.appendChild(newAnnotationNode);
         }
@@ -298,13 +326,13 @@
             // TODO code rest of construction code
             if (RubyChildAnalyzer.isElementWithTag(currentChild, "rt")) {
                 this.commitAutomaticAnnotation(i);
-                this.annotations.push(currentChild);
+                this.annotations.push(new AnnotationDescriptor(currentChild));
                 continue;
             }
             if (this.currentAutomaticAnnotationNodes.length === 0) {
                 this.currentAutomaticAnnotationRangeStart = i;
             }
-            this.currentAutomaticAnnotationNodes.push(currentChild);
+            this.currentAutomaticAnnotationNodes.push(new AnnotationDescriptor(currentChild));
         }
 
     }; // end of RTC Node Processor Definition
@@ -354,7 +382,7 @@
                 return;
             }
             for (i = 0; i < this.currentAutomaticBaseNodes.length; i++) {
-                if (!RubyChildAnalyzer.isEmptyTextContainerNode(this.currentAutomaticBaseNodes[i])) {
+                if (!RubyChildAnalyzer.isEmptyTextContainerNode(this.currentAutomaticBaseNodes[i].node)) {
                     if (this.currentBases.length === 0) {
                         this.currentBaseRangeStart = this.currentAutomaticBaseRangeStart;
                     }
@@ -412,7 +440,7 @@
                 if (this.currentAnnotations.length === 0) {
                     this.currentAnnotationsRangeStart = i;
                 }
-                this.currentAnnotations.push(currentChild);
+                this.currentAnnotations.push(new AnnotationDescriptor(currentChild));
                 continue;
             }
 
@@ -454,7 +482,7 @@
                 if (this.currentBases.length === 0) {
                     this.currentBasesRangeStart = i;
                 }
-                this.currentBases.push(currentChild);
+                this.currentBases.push(new BaseDescriptor(currentChild));
                 continue;
             }
 
@@ -462,7 +490,7 @@
                 this.currentAutomaticBaseRangeStart = i;
             }
 //            console.log("pushing child onto bases: " + currentChild);
-            this.currentAutomaticBaseNodes.push(currentChild);
+            this.currentAutomaticBaseNodes.push(new BaseDescriptor(currentChild));
         } // for
         this.commitRubySegment(this.children.length);
         // end construction code
