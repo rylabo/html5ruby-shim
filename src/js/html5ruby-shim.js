@@ -8,6 +8,8 @@
         RTCNodeProcessor = {},
         RubyProcessor = {},
         SegmentProcessor = {},
+        ArrayValuation,
+        RubyLayoutManager,
         BaseDescriptor,
         AnnotationDescriptor,
         rubyNode,
@@ -16,11 +18,461 @@
         ns,
         i,
         j,
+        layout,
         newRubyNode;
+
+    function htmlCollectionToArray(collection) {
+        var index,
+            newArray = [];
+        for (index = 0; index < collection.length; index++) {
+            newArray.push(collection[index]);
+        }
+        return newArray;
+    }
+
+    ArrayValuation = function (array, valuationFunction) {
+        var valuation = array.map(valuationFunction);
+        this.getValuation = function () { return valuation; };
+    };
+
+    ArrayValuation.prototype.getMax = function () { return Math.max.apply(null, this.getValuation()); };
+    ArrayValuation.prototype.getMin = function () { return Math.min.apply(null, this.getValuation()); };
+    ArrayValuation.prototype.getTotal = function () {
+        var valuation = this.getValuation(),
+            summation = function (a, b) {return a + b; },
+            value = 0;
+
+        if (valuation.length === 1) {
+            value = valuation[0];
+        } else if (valuation.length > 1) {
+            value = this.getValuation().reduce(summation);
+        }
+        return value;
+    };
+
 
     function insertAfter(newNode, referenceNode) {
         referenceNode.parentNode.insertBefore(newNode, referenceNode.nextSibling);
     }
+
+    RubyLayoutManager = function (rubyElement, rubySegments) {
+        var annotationContainers,
+            RubyPositioningManager,
+            RubyAlignmentManager,
+            RubyMergingManager,
+            RubyEdgeManager,
+            positioningManager,
+            alignmentManager,
+            mergingManager,
+            edgeManager;
+
+        RubyPositioningManager = function (rubyElement) {
+            //TODO implement annotation container stacking
+            var annotationContainers,
+
+                // PRIVATE METHODS
+                getAnnotationContainerHeight,
+                separateAnnotationContainers,
+                calculateNeededVerticalSpace,
+                normalizeContainerHeights,
+                stackAnnotationContainers,
+                expandRubyElementHeight;
+
+            getAnnotationContainerHeight = function (annotationContainer) {
+                var annotationHeights,
+                    annotationElements,
+                    annotationHeight;
+                annotationHeight = function (rubyAnnotation) {
+                    var height = window.getComputedStyle(rubyAnnotation).height;
+                    return parseInt(height, 10);
+                };
+                annotationElements = htmlCollectionToArray(annotationContainer.getElementsByTagName("rt"));
+                annotationHeights = new ArrayValuation(annotationElements, annotationHeight);
+                return annotationHeights.getMax();
+            };
+
+            separateAnnotationContainers = function (annotationContainers) {
+                var aContainers = {above : [], below : []},
+                    position,
+                    index;
+                for (index = 0; index < annotationContainers.length; index++) {
+                    position = annotationContainers[index].getAttribute("data-ruby-position").split(" ");
+                    if ((position[0].toLowerCase() === "above") || (position[1].toLowerCase() === "above")) {
+                        aContainers.above.push(annotationContainers[index]);
+                    } else if ((position[0].toLowerCase() === "below") || (position[1].toLowerCase() === "below")) {
+                        aContainers.below.push(annotationContainers[index]);
+                    } else {
+                        if (index === 0) {
+                            aContainers.above.push(annotationContainers[index]);
+                        } else {
+                            aContainers.below.push(annotationContainers[index]);
+                        }
+                    }
+                }
+
+                return aContainers;
+            };
+
+            calculateNeededVerticalSpace = function (annotationContainers) {
+                var sortedContainers = separateAnnotationContainers(annotationContainers),
+                    topAnnotationHeights = new ArrayValuation(sortedContainers.above, getAnnotationContainerHeight),
+                    bottomAnnotationHeights = new ArrayValuation(sortedContainers.below, getAnnotationContainerHeight),
+                    value = {top : topAnnotationHeights.getTotal(), bottom : bottomAnnotationHeights.getTotal()};
+                // now calculate how much space above and below we need. This will be our margins
+                // expandRubyElementHeight
+                sortedContainers = null;
+                topAnnotationHeights = null;
+                bottomAnnotationHeights = null;
+                return value;
+            };
+
+            normalizeContainerHeights = function (annotationContainers) {
+                var index;
+                for (index = 0; index < annotationContainers.length; index++) {
+                    annotationContainers[index].style.height = getAnnotationContainerHeight(annotationContainers[index]) + "px";
+                }
+            };
+
+            expandRubyElementHeight = function (rubyElement) {
+                var annotationContainers = htmlCollectionToArray(rubyElement.getElementsByTagName("rtc")),
+                    neededVerticalSpace = calculateNeededVerticalSpace(annotationContainers);
+                normalizeContainerHeights(annotationContainers);
+                rubyElement.style.paddingTop = neededVerticalSpace.top + "px";
+                rubyElement.style.paddingBottom = neededVerticalSpace.bottom + "px";
+            };
+
+            // initialization code
+            expandRubyElementHeight(rubyElement);
+
+        };
+
+        RubyAlignmentManager = function (rubySegments) {
+            var AlignmentBlock,
+                AlignmentColumn,
+                AlignerFactory,
+                columns = [],
+                spannedBasesCount, // function that counts how many bases are spanned
+                getMaxTotalWidth, // measures the horizontal space a group of elements take up, including margin space
+                addSpacing,
+
+                getAligningColumns,
+                getBaseElement,
+                getAnnotationElement,
+                getElementFromDescriptor,
+                getElementRow,
+                getBaseArray,
+                getAnnotationArray,
+                toRowMatrix,
+                toColumnMatrix;
+
+            AlignerFactory = (function () {
+                var CenterAlignment = (function () {
+                        var instance;
+                        function createInstance() {
+                            // private parts
+                            return {
+                                // public methods
+                                widen : function (alignmentBlock, newWidth) {
+                                    var blockContents = alignmentBlock.getContents(),
+                                        width = newWidth - alignmentBlock.getWidth(),
+                                        expandLeft = width / 2,
+                                        expandRight = width / 2,
+                                        firstElement = blockContents[0].node,
+                                        lastElement = blockContents[blockContents.length - 1].node,
+                                        firstElementLeftMargin = parseInt(window.getComputedStyle(firstElement).marginLeft, 10),
+                                        lastElementRightMargin = parseInt(window.getComputedStyle(lastElement).marginRight, 10);
+
+                                    firstElement.style.marginLeft = (firstElementLeftMargin + expandLeft) + "px";
+                                    lastElement.style.marginRight = (lastElementRightMargin + expandRight) + "px";
+                                }
+                            };
+                        }
+
+                        return {
+                            get : function () {
+                                if (!instance) {
+                                    instance = createInstance();
+                                }
+
+                                return instance;
+                            }
+                        };
+                    }()),
+
+                    SpaceBetweenAlignment = (function () {
+                        var instance;
+                        function createInstance() {
+                            // private parts
+                            return {
+                                // public methods
+                                widen : function (alignmentBlock, newWidth) {
+                                    throw new Error("widening function not implemented.");
+                                }
+                            };
+                        }
+
+                        return {
+                            get : function () {
+                                if (!instance) {
+                                    instance = createInstance();
+                                }
+
+                                return instance;
+                            }
+                        };
+                    }()),
+                    SpaceAroundAlignment = (function () {
+                        var instance;
+                        function createInstance() {
+                            // private parts
+                            return {
+                                // public methods
+                                widen : function (alignmentBlock, newWidth) {
+                                    throw new Error("widening function not implemented.");
+                                }
+                            };
+                        }
+
+                        return {
+                            get : function () {
+                                if (!instance) {
+                                    instance = createInstance();
+                                }
+
+                                return instance;
+                            }
+                        };
+                    }()),
+
+                    StartAlignment = (function () {
+                        var instance;
+                        function createInstance() {
+                            // private parts
+                            return {
+                                // public methods
+                                widen : function (alignmentBlock, newWidth) {
+                                    throw new Error("widening function not implemented.");
+                                }
+                            };
+                        }
+
+                        return {
+                            get : function () {
+                                if (!instance) {
+                                    instance = createInstance();
+                                }
+
+                                return instance;
+                            }
+                        };
+                    }()),
+                    alignments = {
+                        "center" : CenterAlignment,
+                        "space-between" : SpaceBetweenAlignment,
+                        "start" : StartAlignment,
+                        "space-around" : SpaceAroundAlignment
+                    };
+                return {
+                    getAlignment : function (alignStyle) {
+                        return alignments[alignStyle].get();
+                    }
+                };
+            }());
+
+
+            AlignmentBlock = function (descriptors, alignStyle) {
+                // accepts either an array or a single of descriptors
+
+                var contents = descriptors;
+                this.aligner = AlignerFactory.getAlignment("center").widen;
+
+                this.getWidth = function () {
+                    var index,
+                        widthTotal = 0,
+                        elementStyle;
+                    // we want to find the total width of all elements within the array.
+                    for (index = 0; index < contents.length; index++) {
+                        elementStyle = window.getComputedStyle(contents[index].node);
+                        widthTotal += contents[index].node.offsetWidth +
+                            parseInt(elementStyle.marginLeft, 10) +
+                            parseInt(elementStyle.marginRight, 10);
+                    }
+                    return widthTotal;
+                };
+
+                this.getContents = function () {
+                    return contents;
+                };
+            };
+
+
+            AlignmentBlock.prototype.expandWidth = function (newWidth) {
+                this.aligner.call(this, this, newWidth);
+            };
+
+            AlignmentColumn = function (descriptorColumn, alignStyle) {
+                var blocks = [],
+                    optimalWidth,
+                    index;
+
+                function getOptimalWidth(alignmentBlocks) {
+                    function getBlockWidth(alignmentBlock) {
+                        return alignmentBlock.getWidth();
+                    }
+                    var widthValues = new ArrayValuation(alignmentBlocks, getBlockWidth);
+                    return widthValues.getMax();
+                }
+
+                for (index = 0; index < descriptorColumn.length; index++) {
+                    blocks.push(new AlignmentBlock(descriptorColumn[index], alignStyle));
+                }
+
+                optimalWidth = getOptimalWidth(blocks);
+
+                for (index = 0; index < blocks.length; index++) {
+                    blocks[index].expandWidth(optimalWidth);
+                }
+            };
+
+            getElementFromDescriptor = function (rubyDescriptor) {
+                return rubyDescriptor.node;
+            };
+
+            getElementRow = function (descriptorArray) {
+                var index,
+                    row = [];
+                for (index = 0; index < descriptorArray.length; index++) {
+                    row.push(getElementFromDescriptor(descriptorArray[index]));
+                }
+                return row;
+            };
+
+            getBaseArray = function (rubySegment) {
+                return getElementRow(rubySegment.bases);
+            };
+
+            getAnnotationArray = function (rubySegment) {
+                var rows = [],
+                    index;
+
+                for (index = 0; index < rubySegment.annotationContainers.length; index++) {
+                    rows.push(getElementRow(annotationContainers[index]));
+                }
+
+                return rows;
+            };
+
+            toRowMatrix = function (rubySegment) {
+                var rows = [],
+                    index;
+                rows.push(rubySegment.bases);
+                for (index = 0; index < rubySegment.annotationContainers.length; index++) {
+                    rows.push(rubySegment.annotationContainers[index].annotationList);
+                }
+                return rows;
+            };
+
+            toColumnMatrix = function (rubySegment) {
+                var rows = toRowMatrix(rubySegment),
+                    columnIndex,
+                    rowIndex,
+                    columns = [],
+                    newColumn;
+
+                for (columnIndex = 0; columnIndex < rows[0].length; columnIndex++) {
+                    newColumn = [];
+                    for (rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+                        if (columnIndex < rows[rowIndex].length) {
+                            newColumn.push(rows[rowIndex][columnIndex]);
+                        }
+                    }
+                    columns.push(newColumn);
+                }
+
+                return columns;
+            };
+
+            getAligningColumns = function (rubySegment) {
+                var singleWidthColumns = [],
+                    columns,
+                    rows,
+                    segmentWidth,
+                    annotationContainerWidth,
+                    rowIndex,
+                    columnIndex,
+                    aligningColumns = [],
+                    aligningColumn,
+                    getIndexSpan,
+                    spanWidth,
+                    getSpanningAlignmentColumn,
+                    aligningBlock;
+
+                columns = toColumnMatrix(rubySegment);
+                rows = toRowMatrix(rubySegment);
+
+
+                getSpanningAlignmentColumn = function (rowMatrix, size) {
+                    var index,
+                        rowFragment,
+                        alignmentColumn = [],
+
+                        hasSpanningAlignmentBlock = function (alignmentColumn) {
+                            for (index = 0; index < alignmentColumn.length; index++) {
+                                if (alignmentColumn[index].length === 1) {
+                                    return true;
+                                }
+                            }
+                            return false;
+                        };
+
+                    for (index = 0; index < rowMatrix.lengh; index++) {
+                        rowFragment = rowMatrix.slice(-size);
+                        if (rowFragment.length !== 0) {
+                            alignmentColumn.push(rowFragment);
+                        }
+                    }
+
+                    if (hasSpanningAlignmentBlock(alignmentColumn)) {return alignmentColumn; }
+                    // else
+                    return null;
+                };
+                // organize single spanning columns first
+
+                for (columnIndex = 0; columnIndex < columns.length; columnIndex++) {
+                    aligningColumn = [];
+                    for (rowIndex = 0; rowIndex < columns[columnIndex].length; rowIndex++) {
+                        if (!columns[columnIndex][rowIndex].span || columns[columnIndex][rowIndex].span.length === 1) {
+                            aligningBlock = [];
+                            aligningBlock.push(columns[columnIndex][rowIndex]);
+                            aligningColumn.push(aligningBlock);
+                        }
+                    }
+                    aligningColumns.push(new AlignmentColumn(aligningColumn));
+                }
+
+                // now gatherup the multi spanning elements
+
+                for (spanWidth = 2; spanWidth <= segmentWidth; spanWidth++) {
+                    aligningColumn = getSpanningAlignmentColumn(spanWidth);
+                    if (aligningColumn) {
+                        aligningColumns.push(new AlignmentColumn(aligningColumn));
+                    }
+                }
+
+                return aligningColumns;
+            };
+            // begin initialization
+            function init() {
+                var index;
+                for (index = 0; index < rubySegments.length; index++) {
+                    columns = columns.concat(getAligningColumns(rubySegments[index]));
+                }
+            }
+            init();
+        };
+        positioningManager = new RubyPositioningManager(rubyElement);
+        alignmentManager = new RubyAlignmentManager(rubySegments);
+    };
 
     RubyShim.nextNonWhitespaceSibling = function (subNode) {
         if (subNode.nextSibling && RubyChildAnalyzer.isWhitespaceNode(subNode.nextSibling)) {
@@ -101,7 +553,6 @@
                 return;
             }
         }
-
     };
 
     RubyShim.flattenContainer = function (DOMelement, DOMparent) {
@@ -124,7 +575,12 @@
 
     // BaseDescriptor
     BaseDescriptor = function (baseNode) {
-        this.node = baseNode;
+        // check if this is a text node, if it is, wrap it.
+        if (baseNode.nodeType === 3) {
+            this.node = RubyShim.wrapChildWithNewElement(baseNode, "rb");
+        } else {
+            this.node = baseNode;
+        }
         this.annotations = [];
     };
     BaseDescriptor.prototype.addAnnotation = function (annotationNode) {
@@ -139,7 +595,6 @@
         this.span.push(baseNode);
     };
 
-
     // Segment Processor Definition
 
     // two stages... process, and collapse
@@ -149,6 +604,8 @@
         // set ruby span on final annotations in each container
         var bases = rubySegment.bases,
             annotationContainers = rubySegment.annotationContainers, // array
+            containerLength,
+            containerLengths,
             maxContainerLength,
             minContainerLength,
             additionalBasesNeeded,
@@ -159,39 +616,13 @@
             index3,
             last;
 
-        maxContainerLength = function (containers) {
-            var val = null,
-                index;
-
-            for (index = 0; index < containers.length; index++) {
-                if (!val) {
-                    val = containers[index].annotationList.length;
-                    continue;
-                }
-                if (containers[index].annotationList.length > val) {
-                    val = containers[index].annotationList.length;
-                }
-            }
-            return val;
+        containerLength = function (container) {
+            return container.annotationList.length;
         };
 
-        minContainerLength = function (containers) {
-            var val = null,
-                index;
+        containerLengths = new ArrayValuation(annotationContainers, containerLength);
 
-            for (index = 0; index < containers.length; index++) {
-                if (!val) {
-                    val = containers[index].annotationList.length;
-                    continue;
-                }
-                if (containers[index].annotationList.length < val) {
-                    val = containers[index].annotationList.length;
-                }
-            }
-            return val;
-        };
-
-        additionalBasesNeeded = maxContainerLength(annotationContainers) - bases.length;
+        additionalBasesNeeded = containerLengths.getMax() - bases.length;
 
         for (index = 0; index < additionalBasesNeeded; index++) {
             rubySegment.bases.push(document.createElement("rb")); // push an empty base node
@@ -213,6 +644,7 @@
             }
         }
 
+
         return rubySegment;
     };
     // returns a freshly minted single segment ruby node.
@@ -224,31 +656,20 @@
             index2,
             maxContainers,
             annotationLevel,
+            annotationLevels,
             maxLevels,
+            getSegmentAnnotationLevels,
             neededContainers,
             fillerAnnotation,
             newAnnotationNode;
-        // concatenate all ruby base arrays into a single base array, and all same level annotation containers
-        // TODO search through segments to determine the highest annotation level.
 
-        maxContainers = function (rubySegments) {
-            var val = null,
-                index;
-
-            for (index = 0; index < rubySegments.length; index++) {
-                if (!val) {
-                    val = rubySegments[index].annotationContainers.length;
-                    continue;
-                }
-                if (rubySegments[index].annotationContainers.length > val) {
-                    val = rubySegments[index].annotationContainers.length;
-                }
-            }
-            return val;
+        getSegmentAnnotationLevels = function (rubySegment) {
+            return rubySegment.annotationContainers.length;
         };
 
-        // initialize our annotation containers
-        maxLevels = maxContainers(rubySegments);
+        annotationLevels = new ArrayValuation(rubySegments, getSegmentAnnotationLevels);
+
+        maxLevels = annotationLevels.getMax();
 //        debugger;
         for (index = 0; index < maxLevels; index++) {
             annotationContainers.push({annotationList: [], range : null});
@@ -263,7 +684,7 @@
                 fillerAnnotation = document.createElement("rt");
                 fillerAnnotation.style["column-span"] = rubySegments[index].bases.length;
                 rubySegments[index].annotationContainers.push({annotationList: [], range : null});
-                rubySegments[index].annotationContainers[annotationLevel].annotationList.push(fillerAnnotation);
+                rubySegments[index].annotationContainers[annotationLevel].annotationList.push(new AnnotationDescriptor(fillerAnnotation));
             }
         }
         // now should have all segments containing the same number of annotation levels
@@ -288,12 +709,19 @@
 
         for (index = 0; index < maxLevels; index++) {
             newAnnotationNode = document.createElement("rtc");
+            // TODO add some logic to apply ruby positioning styling if not present
+            if (index === 0) {
+                newAnnotationNode.setAttribute("data-ruby-position", "above right");
+            } else {
+                newAnnotationNode.setAttribute("data-ruby-position", "below left");
+            }
             for (index2 = 0; index2 < annotationContainers[index].annotationList.length; index2++) {
                 newAnnotationNode.appendChild(annotationContainers[index].annotationList[index2].node);
             }
             newNode.appendChild(newAnnotationNode);
         }
         return newNode;
+
     };
     // RTC Node Processor Definition
 
@@ -650,6 +1078,7 @@
         var children = rubyNode.childNodes,
             newNode,
             i;
+        //
         for (i = 0; i < children.length; i++) {
             // flatten node if necessary
             if (RubyChildAnalyzer.isAtomicRubyElement(children.item(i))) {
@@ -704,8 +1133,10 @@
             SegmentProcessor.process(rubySegs[j]);
         }
         newRubyNode = SegmentProcessor.collapseIntoNode(rubySegs);
+        // finally, we need to calculate the layout of the ruby element itself
         rubyChildren[i].parentElement.replaceChild(newRubyNode, rubyChildren[i]);
-//        console.log(JSON.stringify(rubySegs));
+        layout = new RubyLayoutManager(newRubyNode, rubySegs);
+
     }
 
     }()
