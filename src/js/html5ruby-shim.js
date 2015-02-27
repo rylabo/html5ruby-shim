@@ -409,30 +409,38 @@
 
                 columns = toColumnMatrix(rubySegment);
                 rows = toRowMatrix(rubySegment);
-
+                segmentWidth = rubySegment.bases.length;
 
                 getSpanningAlignmentColumn = function (rowMatrix, size) {
                     var index,
                         rowFragment,
                         alignmentColumn = [],
+                        matrixWidth = rowMatrix[0].length,
+                        sliceIndex = matrixWidth - size,
 
                         hasSpanningAlignmentBlock = function (alignmentColumn) {
                             for (index = 0; index < alignmentColumn.length; index++) {
+                                // checks for the presence of a single element
                                 if (alignmentColumn[index].length === 1) {
                                     return true;
                                 }
                             }
                             return false;
                         };
+                    // WRONG!
 
-                    for (index = 0; index < rowMatrix.lengh; index++) {
-                        rowFragment = rowMatrix.slice(-size);
+                    // first, slice off hte first row, as these are our bases.
+                    // all other rows are sliced based on this
+                    for (index = 0; index < rowMatrix.length; index++) {
+                        rowFragment = rowMatrix[index].slice(sliceIndex);
                         if (rowFragment.length !== 0) {
                             alignmentColumn.push(rowFragment);
                         }
                     }
 
-                    if (hasSpanningAlignmentBlock(alignmentColumn)) {return alignmentColumn; }
+                    if (hasSpanningAlignmentBlock(alignmentColumn)) {
+                        return alignmentColumn;
+                    }
                     // else
                     return null;
                 };
@@ -453,7 +461,7 @@
                 // now gatherup the multi spanning elements
 
                 for (spanWidth = 2; spanWidth <= segmentWidth; spanWidth++) {
-                    aligningColumn = getSpanningAlignmentColumn(spanWidth);
+                    aligningColumn = getSpanningAlignmentColumn(rows, spanWidth);
                     if (aligningColumn) {
                         aligningColumns.push(new AlignmentColumn(aligningColumn));
                     }
