@@ -2,16 +2,18 @@
 /*global console */
 
 (function () { "use strict";
-    var RubyChildAnalyzer = {},
+    var NodeInspector = {},
         RubyPreprocessor = {},
-        RubyShim = {},
-        RTCNodeProcessor = {},
-        RubyProcessor = {},
+        RubyDOMRebuilder = {},
+        AnnotationContainerDescriptorBuilder = {},
+        RubyDescriptorBuilder = {},
         SegmentProcessor = {},
         ArrayValuation,
         RubyLayoutManager,
         BaseDescriptor,
         AnnotationDescriptor,
+        RubySegment,
+        AnnotationContainer,
         rubyNode,
         rubyChildren,
         rubySegs,
@@ -29,6 +31,10 @@
         }
         return newArray;
     }
+
+    /************************************************
+    * ArrayValuation Class Definition
+    ************************************************/
 
     ArrayValuation = function (array, valuationFunction) {
         var valuation = array.map(valuationFunction);
@@ -55,6 +61,10 @@
         referenceNode.parentNode.insertBefore(newNode, referenceNode.nextSibling);
     }
 
+    /************************************************
+    * RubyLayoutManager Class Definition
+    ************************************************/
+
     RubyLayoutManager = function (rubyElement, rubySegments) {
         var annotationContainers,
             RubyPositioningManager,
@@ -65,6 +75,10 @@
             alignmentManager,
             mergingManager,
             edgeManager;
+
+        /************************************************
+        * RubyLayoutManager.RubyPositioningManager Class Definition
+        ************************************************/
 
         RubyPositioningManager = function (rubyElement) {
             //TODO implement annotation container stacking
@@ -146,6 +160,10 @@
 
         };
 
+        /************************************************
+        * RubyLayoutManager.RubyAlignmentManager Class Definition
+        ************************************************/
+
         RubyAlignmentManager = function (rubySegments) {
             var AlignmentBlock,
                 AlignmentColumn,
@@ -165,120 +183,70 @@
                 toRowMatrix,
                 toColumnMatrix;
 
+            /************************************************
+            * RubyLayoutManager.RubyAlignmentManager.AlignerFactory Class Definition
+            ************************************************/
+
             AlignerFactory = (function () {
                 var CenterAlignment = (function () {
-                        var instance;
-                        function createInstance() {
-                            // private parts
-                            return {
-                                // public methods
-                                widen : function (alignmentBlock, newWidth) {
-                                    var blockContents = alignmentBlock.getContents(),
-                                        width = newWidth - alignmentBlock.getWidth(),
-                                        expandLeft = width / 2,
-                                        expandRight = width / 2,
-                                        firstElement = blockContents[0].node,
-                                        lastElement = blockContents[blockContents.length - 1].node,
-                                        firstElementLeftMargin = parseInt(window.getComputedStyle(firstElement).marginLeft, 10),
-                                        lastElementRightMargin = parseInt(window.getComputedStyle(lastElement).marginRight, 10);
-
-                                    firstElement.style.marginLeft = (firstElementLeftMargin + expandLeft) + "px";
-                                    lastElement.style.marginRight = (lastElementRightMargin + expandRight) + "px";
-                                }
-                            };
-                        }
-
                         return {
-                            get : function () {
-                                if (!instance) {
-                                    instance = createInstance();
-                                }
+                            widen : function (alignmentBlock, newWidth) {
+                                var blockContents = alignmentBlock.getContents(),
+                                    width = newWidth - alignmentBlock.getWidth(),
+                                    expandLeft = width / 2,
+                                    expandRight = width / 2,
+                                    firstElement = blockContents[0].node,
+                                    lastElement = blockContents[blockContents.length - 1].node,
+                                    firstElementLeftMargin = parseInt(window.getComputedStyle(firstElement).marginLeft, 10),
+                                    lastElementRightMargin = parseInt(window.getComputedStyle(lastElement).marginRight, 10);
 
-                                return instance;
+                                firstElement.style.marginLeft = (firstElementLeftMargin + expandLeft) + "px";
+                                lastElement.style.marginRight = (lastElementRightMargin + expandRight) + "px";
                             }
                         };
                     }()),
 
                     SpaceBetweenAlignment = (function () {
-                        var instance;
-                        function createInstance() {
-                            // private parts
-                            return {
-                                // public methods
-                                widen : function (alignmentBlock, newWidth) {
-                                    throw new Error("widening function not implemented.");
-                                }
-                            };
-                        }
-
                         return {
-                            get : function () {
-                                if (!instance) {
-                                    instance = createInstance();
-                                }
-
-                                return instance;
+                            widen : function (alignmentBlock, newWidth) {
+                                throw new Error("widening function not implemented.");
                             }
                         };
                     }()),
+
                     SpaceAroundAlignment = (function () {
-                        var instance;
-                        function createInstance() {
-                            // private parts
-                            return {
-                                // public methods
-                                widen : function (alignmentBlock, newWidth) {
-                                    throw new Error("widening function not implemented.");
-                                }
-                            };
-                        }
-
                         return {
-                            get : function () {
-                                if (!instance) {
-                                    instance = createInstance();
-                                }
-
-                                return instance;
+                            widen : function (alignmentBlock, newWidth) {
+                                throw new Error("widening function not implemented.");
                             }
                         };
                     }()),
 
                     StartAlignment = (function () {
-                        var instance;
-                        function createInstance() {
-                            // private parts
-                            return {
-                                // public methods
-                                widen : function (alignmentBlock, newWidth) {
-                                    throw new Error("widening function not implemented.");
-                                }
-                            };
-                        }
-
                         return {
-                            get : function () {
-                                if (!instance) {
-                                    instance = createInstance();
-                                }
-
-                                return instance;
+                            widen : function (alignmentBlock, newWidth) {
+                                throw new Error("widening function not implemented.");
                             }
                         };
                     }()),
+
                     alignments = {
                         "center" : CenterAlignment,
                         "space-between" : SpaceBetweenAlignment,
                         "start" : StartAlignment,
                         "space-around" : SpaceAroundAlignment
                     };
+
                 return {
                     getAlignment : function (alignStyle) {
-                        return alignments[alignStyle].get();
+                        return alignments[alignStyle];
                     }
                 };
             }());
 
+            /************************************************
+            * RubyLayoutManager.RubyAlignmentManager.AlignmentBlock Class Definition
+            ************************************************/
 
             AlignmentBlock = function (descriptors, alignStyle) {
                 // accepts either an array or a single of descriptors
@@ -310,6 +278,10 @@
                 this.aligner.call(this, this, newWidth);
             };
 
+            /************************************************
+            * RubyLayoutManager.RubyAlignmentManager.AlignmentColumn Class Definition
+            ************************************************/
+
             AlignmentColumn = function (descriptorColumn, alignStyle) {
                 var blocks = [],
                     optimalWidth,
@@ -332,34 +304,6 @@
                 for (index = 0; index < blocks.length; index++) {
                     blocks[index].expandWidth(optimalWidth);
                 }
-            };
-
-            getElementFromDescriptor = function (rubyDescriptor) {
-                return rubyDescriptor.node;
-            };
-
-            getElementRow = function (descriptorArray) {
-                var index,
-                    row = [];
-                for (index = 0; index < descriptorArray.length; index++) {
-                    row.push(getElementFromDescriptor(descriptorArray[index]));
-                }
-                return row;
-            };
-
-            getBaseArray = function (rubySegment) {
-                return getElementRow(rubySegment.bases);
-            };
-
-            getAnnotationArray = function (rubySegment) {
-                var rows = [],
-                    index;
-
-                for (index = 0; index < rubySegment.annotationContainers.length; index++) {
-                    rows.push(getElementRow(annotationContainers[index]));
-                }
-
-                return rows;
             };
 
             toRowMatrix = function (rubySegment) {
@@ -427,10 +371,7 @@
                             }
                             return false;
                         };
-                    // WRONG!
 
-                    // first, slice off hte first row, as these are our bases.
-                    // all other rows are sliced based on this
                     for (index = 0; index < rowMatrix.length; index++) {
                         rowFragment = rowMatrix[index].slice(sliceIndex);
                         if (rowFragment.length !== 0) {
@@ -482,32 +423,36 @@
         alignmentManager = new RubyAlignmentManager(rubySegments);
     };
 
-    RubyShim.nextNonWhitespaceSibling = function (subNode) {
-        if (subNode.nextSibling && RubyChildAnalyzer.isWhitespaceNode(subNode.nextSibling)) {
-            return RubyShim.nextNonWhitespaceSibling(subNode.nextSibling);
+    /************************************************
+    * RubyDOMRebuilder Class Definition
+    ************************************************/
+
+    RubyDOMRebuilder.nextNonWhitespaceSibling = function (subNode) {
+        if (subNode.nextSibling && NodeInspector.isWhitespaceNode(subNode.nextSibling)) {
+            return RubyDOMRebuilder.nextNonWhitespaceSibling(subNode.nextSibling);
         }
         // else
         return subNode.nextSibling;
     };
 
-    RubyShim.wrapChildWithNewElement = function (child, newElementTag) {
+    RubyDOMRebuilder.wrapChildWithNewElement = function (child, newElementTag) {
         var newNode = document.createElement(newElementTag);
         newNode.appendChild(child);
         return newNode;
     };
 
-    RubyShim.wrapChildInNewElementAndPrepend = function (rubyNode, child, newElementTag) {
-        var newNode = RubyShim.wrapChildWithNewElement(child, newElementTag);
+    RubyDOMRebuilder.wrapChildInNewElementAndPrepend = function (rubyNode, child, newElementTag) {
+        var newNode = RubyDOMRebuilder.wrapChildWithNewElement(child, newElementTag);
         rubyNode.insertBefore(newNode, rubyNode.firstChild);
         return rubyNode;
     };
 
-    RubyShim.buildNewTextContainerNode = function (child) {
+    RubyDOMRebuilder.buildNewTextContainerNode = function (child) {
         var newNode = document.createElement("rtc"),
             newRubyTextNode;
-        while (child.nextSibling && !(RubyChildAnalyzer.isTextContainerDelimiter(child.nextSibling))) {
-            if (RubyChildAnalyzer.isTextNode(child.nextSibling)) {
-                newNode.appendChild(RubyShim.wrapChildWithNewElement(child.nextSibling, "rt"));
+        while (child.nextSibling && !(NodeInspector.isTextContainerDelimiter(child.nextSibling))) {
+            if (NodeInspector.isTextNode(child.nextSibling)) {
+                newNode.appendChild(RubyDOMRebuilder.wrapChildWithNewElement(child.nextSibling, "rt"));
             } else {
                 newNode.appendChild(child.nextSibling);
             }
@@ -515,18 +460,18 @@
         return newNode;
     };
 
-    RubyShim.appendToContainerNode = function (rubyNode, containerNode, child) {
+    RubyDOMRebuilder.appendToContainerNode = function (rubyNode, containerNode, child) {
         var nextChild, newNode;
         if (!child) {
             return containerNode;
         }
-        nextChild = RubyShim.nextNonWhitespaceSibling(child);
-        if (RubyChildAnalyzer.isNonEmptyBaseNode(child)) {
+        nextChild = RubyDOMRebuilder.nextNonWhitespaceSibling(child);
+        if (NodeInspector.isNonEmptyBaseNode(child)) {
             containerNode.appendChild(child);
-        } else if (RubyChildAnalyzer.isEmptyBaseNodeThenTextNode(child)) {
+        } else if (NodeInspector.isEmptyBaseNodeThenTextNode(child)) {
             // we eventually need to pull the loose empty base nodes from the ruby node
-            newNode = RubyShim.wrapChildWithNewElement(RubyShim.nextNonWhitespaceSibling(child), "rb");
-            nextChild = RubyShim.nextNonWhitespaceSibling(child);
+            newNode = RubyDOMRebuilder.wrapChildWithNewElement(RubyDOMRebuilder.nextNonWhitespaceSibling(child), "rb");
+            nextChild = RubyDOMRebuilder.nextNonWhitespaceSibling(child);
             rubyNode.removeChild(child);
             containerNode.appendChild(newNode);
         } else if ((child.tagName.toLowerCase() === "rt") ||
@@ -534,26 +479,26 @@
                         (child.tagName.toLowerCase() === "rp")) {
             return containerNode;
         }
-        return RubyShim.appendToContainerNode(rubyNode, containerNode, nextChild);
+        return RubyDOMRebuilder.appendToContainerNode(rubyNode, containerNode, nextChild);
     };
 
-    RubyShim.buildNewBaseContainerNode = function (rubyNode, child) {
+    RubyDOMRebuilder.buildNewBaseContainerNode = function (rubyNode, child) {
         var newNode = document.createElement("rbc"),
-            nextChild = RubyShim.nextNonWhitespaceSibling(child);
-        if (RubyChildAnalyzer.isTextNode(nextChild)) {
-            newNode.appendChild(RubyShim.wrapChildWithNewElement(nextChild, "rb"));
+            nextChild = RubyDOMRebuilder.nextNonWhitespaceSibling(child);
+        if (NodeInspector.isTextNode(nextChild)) {
+            newNode.appendChild(RubyDOMRebuilder.wrapChildWithNewElement(nextChild, "rb"));
         }
-        return RubyShim.appendToContainerNode(rubyNode, newNode, nextChild);
+        return RubyDOMRebuilder.appendToContainerNode(rubyNode, newNode, nextChild);
     };
 
-    RubyShim.flatten = function (DOMelement, DOMparent) {
+    RubyDOMRebuilder.flatten = function (DOMelement, DOMparent) {
         // rb, rt, rp, rtc
         var i = 0,
             j = 0,
             branches = DOMelement.childNodes;
 
         for (i = 0; i < branches.length; i++) {
-            if (RubyChildAnalyzer.isRubyChildDelimiter(branches.item(i))) {
+            if (NodeInspector.isRubyChildDelimiter(branches.item(i))) {
                 // TODO pull out all elements and insert after and including this element within the parent
                 for (j = branches.length - 1; j >= i; j--) {
                     DOMparent.insertBefore(branches.item(j), DOMelement.nextSibling);
@@ -563,14 +508,14 @@
         }
     };
 
-    RubyShim.flattenContainer = function (DOMelement, DOMparent) {
+    RubyDOMRebuilder.flattenContainer = function (DOMelement, DOMparent) {
         // rb, rt, rp, rtc
         var i = 0,
             j = 0,
             branches = DOMelement.childNodes;
 
         for (i = 0; i < branches.length; i++) {
-            if (RubyChildAnalyzer.isTextContainerDelimiter(branches.item(i))) {
+            if (NodeInspector.isTextContainerDelimiter(branches.item(i))) {
                 // TODO pull out all elements and insert after and including this element within the parent
                 for (j = branches.length - 1; j >= i; j--) {
                     DOMparent.insertBefore(branches.item(j), DOMelement.nextSibling);
@@ -581,11 +526,14 @@
 
     };
 
-    // BaseDescriptor
+    /************************************************
+    * BaseDescriptor Class Definition
+    ************************************************/
+
     BaseDescriptor = function (baseNode) {
         // check if this is a text node, if it is, wrap it.
         if (baseNode.nodeType === 3) {
-            this.node = RubyShim.wrapChildWithNewElement(baseNode, "rb");
+            this.node = RubyDOMRebuilder.wrapChildWithNewElement(baseNode, "rb");
         } else {
             this.node = baseNode;
         }
@@ -595,24 +543,32 @@
         this.annotations.push(annotationNode);
     };
 
+    /************************************************
+    * AnnotationDescriptor Class Definition
+    ************************************************/
+
     AnnotationDescriptor = function (annotationNode) {
-        this.node = annotationNode;
+        if (annotationNode.nodeType === 3) {
+            this.node = RubyDOMRebuilder.wrapChildWithNewElement(annotationNode, "rt");
+        } else {
+            this.node = annotationNode;
+        }
+        this.annotations = [];
         this.span = [];
     };
     AnnotationDescriptor.prototype.addSpannedBase = function (baseNode) {
         this.span.push(baseNode);
     };
 
-    // Segment Processor Definition
+    /************************************************
+    * SegmentProcessor Class Definition
+    ************************************************/
 
-    // two stages... process, and collapse
+    // Normalizes and pairs ruby segment, then rebuilds the DOM node based on the pairings
+
     SegmentProcessor.process = function (rubySegment) {
-        // find the max and minimum number of annotations in a container
-        // pad base container of necessary
-        // set ruby span on final annotations in each container
         var bases = rubySegment.bases,
             annotationContainers = rubySegment.annotationContainers, // array
-            containerLength,
             containerLengths,
             maxContainerLength,
             minContainerLength,
@@ -624,18 +580,23 @@
             index3,
             last;
 
-        containerLength = function (container) {
+        function containerLength(container) {
             return container.annotationList.length;
-        };
+        }
+
+        function padWithBases(rubySegment, basesToAdd) {
+
+            for (index = 0; index < basesToAdd; index++) {
+                rubySegment.bases.push(document.createElement("rb")); // push an empty base node
+            }
+
+            return rubySegment.bases;
+        }
 
         containerLengths = new ArrayValuation(annotationContainers, containerLength);
 
         additionalBasesNeeded = containerLengths.getMax() - bases.length;
-
-        for (index = 0; index < additionalBasesNeeded; index++) {
-            rubySegment.bases.push(document.createElement("rb")); // push an empty base node
-        }
-        bases = rubySegment.bases;
+        bases = padWithBases(rubySegment, additionalBasesNeeded);
 
         for (index = 0; index < annotationContainers.length; index++) {
             for (index2 = 0; index2 < bases.length; index2++) {
@@ -707,8 +668,8 @@
         // and a set of containers. Begin ruby node construction:
 
         for (index = 0; index < bases.length; index++) {
-            if (RubyChildAnalyzer.isTextNode(bases[index].node)) {
-                newNode.appendChild(RubyShim.wrapChildWithNewElement(bases[index].node, "rb"));
+            if (NodeInspector.isTextNode(bases[index].node)) {
+                newNode.appendChild(RubyDOMRebuilder.wrapChildWithNewElement(bases[index].node, "rb"));
             } else {
                 newNode.appendChild(bases[index].node);
             }
@@ -731,9 +692,12 @@
         return newNode;
 
     };
-    // RTC Node Processor Definition
 
-    RTCNodeProcessor = function (rtcNode) {
+    /************************************************
+    * AnnotationContainerDescriptorBuilder Class Definition
+    ************************************************/
+
+    AnnotationContainerDescriptorBuilder = function (rtcNode) {
         this.root = rtcNode;
         this.annotations = [];
         this.currentAutomaticAnnotationNodes = [];
@@ -745,7 +709,7 @@
                 return;
             }
             for (i = 0; i < this.currentAutomaticAnnotationNodes.length; i++) {
-                if (!RubyChildAnalyzer.isEmptyTextContainerNode(this.currentAutomaticAnnotationNodes[i])) {
+                if (!NodeInspector.isEmptyTextContainerNode(this.currentAutomaticAnnotationNodes[i])) {
                     this.annotations = this.annotations.concat(this.currentAutomaticAnnotationNodes);
                     break;
                 }
@@ -760,7 +724,7 @@
         for (i = 0; i < this.children.length; i++) {
             currentChild = this.children.item(i);
             // TODO code rest of construction code
-            if (RubyChildAnalyzer.isElementWithTag(currentChild, "rt")) {
+            if (NodeInspector.isElementWithTag(currentChild, "rt")) {
                 this.commitAutomaticAnnotation(i);
                 this.annotations.push(new AnnotationDescriptor(currentChild));
                 continue;
@@ -770,187 +734,232 @@
             }
             this.currentAutomaticAnnotationNodes.push(new AnnotationDescriptor(currentChild));
         }
-
     }; // end of RTC Node Processor Definition
 
-    RTCNodeProcessor.getDescriptor = function (rtcNode) {
-        var rtcProcessor = new RTCNodeProcessor(rtcNode);
+    AnnotationContainerDescriptorBuilder.getDescriptor = function (rtcNode) {
+        var rtcProcessor = new AnnotationContainerDescriptorBuilder(rtcNode);
         return rtcProcessor.annotations;
     };
 
-    // Ruby Processor Definition
-    RubyProcessor = function (rubyNode) {
+    /************************************************
+    * RubySegment Class Definition
+    ************************************************/
+
+    RubySegment = function (baseContainer, annotationContainers) {
+        return {
+            bases: baseContainer,
+            annotationContainers : annotationContainers
+        };
+    };
+
+    /************************************************
+    * AnnotationContainer Class Definition
+    ************************************************/
+
+    AnnotationContainer = function (annotations) {
+        return {
+            annotationList : annotations
+        };
+    };
+
+    /************************************************
+    * RubyBaseBuilder Class Definition
+    ************************************************/
+
+    /************************************************
+    * RubyAnnotationBuilder Class Definition
+    ************************************************/
+
+    /************************************************
+    * AnnotationContainerBuilder Class Definition
+    ************************************************/
+
+    /************************************************
+    * RubyDescriptorBuilder Class Definition
+    ************************************************/
+
+    RubyDescriptorBuilder = function (rubyNode) {
+        var currentChild,
+            lookaheadIndex,
+            peekChild,
+            i,
+        /************************************************
+        * RubyDescriptorBuilder.SegmentBuilder Class Definition
+        ************************************************/
+
+            SegmentBuilder = function () {
+                var currentBases = [],
+                    currentAnnotations = [],
+                    currentAnnotationContainers = [],
+                    currentAutomaticBaseNodes = [];
+
+                function commitAutomaticBase() {
+                    var i;
+                    if (currentAutomaticBaseNodes.length === 0) {
+                        return;
+                    }
+                    for (i = 0; i < currentAutomaticBaseNodes.length; i++) {
+                        if (!NodeInspector.isEmptyTextContainerNode(currentAutomaticBaseNodes[i].node)) {
+                            break;
+                        }
+                    }
+                    currentBases = currentBases.concat(currentAutomaticBaseNodes);
+                    currentAutomaticBaseNodes = [];
+                }
+
+                function commitCurrentAnnotations() {
+                    if (currentAnnotations.length !== 0) {
+                        currentAnnotationContainers.push(new AnnotationContainer(currentAnnotations));
+                    }
+                    currentAnnotations = [];
+                }
+
+                this.add = function (containerType, container) {
+                    switch (containerType) {
+                    case "base":
+                        commitAutomaticBase();
+                        currentBases.push(container);
+                        break;
+                    case "automatic base":
+                        currentAutomaticBaseNodes.push(container);
+                        break;
+                    case "annotation":
+                        commitAutomaticBase();
+                        currentAnnotations.push(container);
+                        break;
+                    case "annotation container":
+                        commitAutomaticBase();
+                        commitCurrentAnnotations();
+                        currentAnnotationContainers.push(container);
+                        break;
+                    default:
+                        throw new Error("Invalid container type specified");
+                    }
+                };
+
+                this.build = function () {
+                    var rubySegment;
+                    commitAutomaticBase();
+                    if ((currentBases.length === 0) &&
+                            (currentAnnotations.length === 0) &&
+                            (currentAnnotationContainers.length === 0)) {
+                        return null;
+                    }
+                    commitCurrentAnnotations();
+                    rubySegment = new RubySegment(currentBases, currentAnnotationContainers);
+                    currentBases = [];
+                    currentAnnotationContainers = [];
+                    return rubySegment;
+                };
+
+                this.buildPending = function () {
+                    return (currentAnnotations.length !== 0) ||
+                        (currentAnnotationContainers.length !== 0);
+                };
+            },
+
+            segmentBuilder = new SegmentBuilder();
         this.root = rubyNode;
         this.rubySegments = [];
-        this.currentBases = [];
-        this.currentBasesRange = null;
-        this.currentBasesRangeStart = null;
-        this.currentAnnotations = [];
-        this.currentAnnotationsRange = null;
-        this.currentAnnotationsRangeStart = null;
-        this.currentAnnotationContainers = [];
-        this.currentAutomaticBaseRangeStart = null;
-        this.currentAutomaticBaseNodes = [];
+
         this.children = this.root.childNodes;
 
-        this.commitRubySegment = function (index) {
-            this.commitAutomaticBase(index);
-            if ((this.currentBases.length === 0) &&
-                    (this.currentAnnotations.length === 0) &&
-                    (this.currentAnnotationContainers.length === 0)) {
+        this.commitRubySegment = function () {
+            var segment = segmentBuilder.build();
+            if (!segment) {
                 return;
             }
-            this.commitBaseRange(index);
-            this.commitCurrentAnnotations(index);
-            this.rubySegments.push({bases : this.currentBases,
-                                    baseRange : this.currentBasesRange,
-                                    annotationContainers : this.currentAnnotationContainers
-                                   });
-            this.currentBases = [];
-            this.currentBasesRange = null;
-            this.currentBasesRangeStart = null;
-            this.currentAnnotationContainers = [];
+            this.rubySegments.push(segment);
         };
-
-        this.commitAutomaticBase = function (index) {
-            var i, j;
-            if (this.currentAutomaticBaseNodes.length === 0) {
-                return;
-            }
-            for (i = 0; i < this.currentAutomaticBaseNodes.length; i++) {
-                if (!RubyChildAnalyzer.isEmptyTextContainerNode(this.currentAutomaticBaseNodes[i].node)) {
-                    if (this.currentBases.length === 0) {
-                        this.currentBaseRangeStart = this.currentAutomaticBaseRangeStart;
-                    }
-                    break;
-                }
-            }
-            this.currentBases = this.currentBases.concat(this.currentAutomaticBaseNodes);
-            this.currentAutomaticBaseNodes = [];
-            this.currentAutomaticBaseRangeStart = null;
-        };
-
-        this.commitBaseRange = function (index) {
-            if ((this.currentBases.length === 0) || !this.currentBasesRange) {
-                return;
-            }
-            this.currentBasesRange = {start: this.currentBasesRangeStart, end: index};
-        };
-
-        this.commitCurrentAnnotations = function (index) {
-            if ((this.currentAnnotations.length !== 0) && !this.currentAnnotationsRange) {
-                this.currentAnnotationsRange = {start: this.currentAnnotationsRangeStart, end: index};
-            }
-            if (this.currentAnnotations.length !== 0) {
-                this.currentAnnotationContainers.push({annotationList: this.currentAnnotations, range: this.currentAnnotationsRange});
-            }
-
-            this.currentAnnotations = [];
-            this.currentAnnotationsRange = null;
-            this.currentAnnotationsRangeStart = null;
-        };
-
         // construction code
 
-        var currentChild, lookaheadIndex, peekChild, loops = 0, i;
         // debugger;
         for (i = 0; i < this.children.length; i++) {
-            loops += 1;
-/*
-            if (loops > 100) {
-                debugger;
-            }
-*/
             currentChild = this.children.item(i);
             if ((currentChild.nodeType !== 1) && (currentChild.nodeType !== 3)) {
                 continue;
             }
 
-            if (RubyChildAnalyzer.isElementWithTag(currentChild, "rp")) {
+            if (NodeInspector.isElementWithTag(currentChild, "rp")) {
                 continue;
             }
 
-            if (RubyChildAnalyzer.isElementWithTag(currentChild, "rt")) {
-                this.commitAutomaticBase(i);
-                this.commitBaseRange(i);
-                if (this.currentAnnotations.length === 0) {
-                    this.currentAnnotationsRangeStart = i;
-                }
-                this.currentAnnotations.push(new AnnotationDescriptor(currentChild));
+            if (NodeInspector.isElementWithTag(currentChild, "rt")) {
+                segmentBuilder.add("annotation", new AnnotationDescriptor(currentChild));
                 continue;
             }
 
-            if (RubyChildAnalyzer.isElementWithTag(currentChild, "rtc")) {
-                this.commitAutomaticBase(i);
-                this.commitBaseRange(i);
-                this.commitCurrentAnnotations(i);
-                this.currentAnnotationContainers.push({annotationList: RTCNodeProcessor.getDescriptor(currentChild),
-                                                       range: {start: i, end: i + 1}});
+            if (NodeInspector.isElementWithTag(currentChild, "rtc")) {
+                segmentBuilder.add(
+                    "annotation container",
+                    new AnnotationContainer(AnnotationContainerDescriptorBuilder.getDescriptor(currentChild))
+                );
                 continue;
             }
 
-            if (RubyChildAnalyzer.isEmptyTextContainerNode(currentChild)) {
+            if (NodeInspector.isEmptyTextContainerNode(currentChild)) {
+                // if we're in the middle of a segment, just move to the next node
                 if (this.currentAnnotations.length !== 0) {
                     continue;
                 }
 
+                // else we need to jump to the next actual node within the segment
                 lookaheadIndex = i + 1;
                 peekChild = this.children.item(lookaheadIndex);
-                while (lookaheadIndex < this.children.length && peekChild && RubyChildAnalyzer.isEmptyTextContainerNode(peekChild)) {
+                while (lookaheadIndex < this.children.length && peekChild && NodeInspector.isEmptyTextContainerNode(peekChild)) {
                     lookaheadIndex += 1;
                     peekChild = this.children.item(lookaheadIndex);
                 }
-                if (RubyChildAnalyzer.isElementWithTag(peekChild, "rt") ||
-                        RubyChildAnalyzer.isElementWithTag(peekChild, "rtc") ||
-                        RubyChildAnalyzer.isElementWithTag(peekChild, "rp")) {
+                if (NodeInspector.isElementWithTag(peekChild, "rt") ||
+                        NodeInspector.isElementWithTag(peekChild, "rtc") ||
+                        NodeInspector.isElementWithTag(peekChild, "rp")) {
                     i = lookaheadIndex - 1;
                     continue;
                 }
             }
+            //iterator cutoff
 
-            if ((this.currentAnnotations.length !== 0) ||
-                    (this.currentAnnotationContainers.length !== 0)) {
-                this.commitRubySegment(i);
+            if (segmentBuilder.buildPending()) {
+                this.commitRubySegment();  // Iterator would return the segment
             }
 
-            if (RubyChildAnalyzer.isElementWithTag(currentChild, "rb")) {
-                this.commitAutomaticBase(i);
-                if (this.currentBases.length === 0) {
-                    this.currentBasesRangeStart = i;
-                }
-                this.currentBases.push(new BaseDescriptor(currentChild));
+            if (NodeInspector.isElementWithTag(currentChild, "rb")) {
+                segmentBuilder.add("base", new BaseDescriptor(currentChild));
                 continue;
             }
-
-            if (this.currentAutomaticBaseNodes.length === 0) {
-                this.currentAutomaticBaseRangeStart = i;
-            }
-//            console.log("pushing child onto bases: " + currentChild);
-            this.currentAutomaticBaseNodes.push(new BaseDescriptor(currentChild));
+            segmentBuilder.add("automatic base", new BaseDescriptor(currentChild));
         } // for
-        this.commitRubySegment(this.children.length);
+        this.commitRubySegment();
         // end construction code
     }; // end of class def
 
-    RubyProcessor.getDescriptor = function (rubyNode) {
-        var rubyProcessor = new RubyProcessor(rubyNode),
-            rubySegments = rubyProcessor.rubySegments;
-//        rubyProcessor = null;
+    RubyDescriptorBuilder.getDescriptor = function (rubyNode) {
+        var descriptorBuilder = new RubyDescriptorBuilder(rubyNode),
+            rubySegments = descriptorBuilder.rubySegments;
+        descriptorBuilder = null;
         return rubySegments;
     };
 
-    RubyChildAnalyzer.isTextNode = function (DOMelement) {
+
+    /************************************************
+    * NodeInspector Class Definition
+    ************************************************/
+
+    NodeInspector.isTextNode = function (DOMelement) {
         return DOMelement.nodeType === 3 && !(/^[\t\n\r ]+$/.test(DOMelement.nodeValue));
     };
-    RubyChildAnalyzer.isWhitespaceNode = function (DOMelement) {
+
+    NodeInspector.isWhitespaceNode = function (DOMelement) {
         return DOMelement.nodeType === 3 && (/^[\t\n\r ]+$/.test(DOMelement.nodeValue));
     };
-    RubyChildAnalyzer.isEmptyBaseContainerNode = function (DOMelement) {
+
+    NodeInspector.isEmptyBaseContainerNode = function (DOMelement) {
         return (DOMelement.nodeType !== 3) &&
             (DOMelement.tagName.toLowerCase() === "rbc") &&
             (DOMelement.childNodes.length === 0);
     };
-    RubyChildAnalyzer.isRubyChildDelimiter = function (DOMelement) {
+
+    NodeInspector.isRubyChildDelimiter = function (DOMelement) {
         return (DOMelement.nodeType !== 3) &&
             ((DOMelement.tagName.toLowerCase() === "rb") ||
              (DOMelement.tagName.toLowerCase() === "rt") ||
@@ -958,29 +967,31 @@
              (DOMelement.tagName.toLowerCase() === "rp"));
 
     };
-    RubyChildAnalyzer.isTextContainerDelimiter = function (DOMelement) {
+
+    NodeInspector.isTextContainerDelimiter = function (DOMelement) {
         return (DOMelement.nodeType !== 3) &&
             ((DOMelement.tagName.toLowerCase() === "rb") ||
              (DOMelement.tagName.toLowerCase() === "rtc") ||
              (DOMelement.tagName.toLowerCase() === "rp"));
     };
 
-    RubyChildAnalyzer.isNonEmptyBaseNode = function (DOMelement) {
+    NodeInspector.isNonEmptyBaseNode = function (DOMelement) {
         // TODO check for telescoping
         // tests to see if the base node is empty but followed by a loose text node
         return (DOMelement.nodeType !== 3) &&
             (DOMelement.tagName.toLowerCase() === "rb") &&
             (DOMelement.childNodes.length !== 0);
     };
-    RubyChildAnalyzer.isEmptyBaseNodeThenTextNode = function (DOMelement) {
+
+    NodeInspector.isEmptyBaseNodeThenTextNode = function (DOMelement) {
         // tests to see if the base node is empty but followed by a loose text node
         return (DOMelement.nodeType !== 3) &&
             (DOMelement.tagName.toLowerCase() === "rb") &&
             (DOMelement.childNodes.length === 0) &&
-            (RubyShim.nextNonWhitespaceSibling(DOMelement).nodeType === 3);
+            (RubyDOMRebuilder.nextNonWhitespaceSibling(DOMelement).nodeType === 3);
     };
 
-    RubyChildAnalyzer.isTelescopingNode = function (DOMelement) {
+    NodeInspector.isTelescopingNode = function (DOMelement) {
         var children,
             i;
         if ((DOMelement.nodeType === 3) ||
@@ -1000,7 +1011,8 @@
         }
         return false;
     };
-    RubyChildAnalyzer.isTelescopingContainerNode = function (DOMelement) {
+
+    NodeInspector.isTelescopingContainerNode = function (DOMelement) {
         var children,
             i;
         if ((DOMelement.nodeType === 3) ||
@@ -1018,47 +1030,52 @@
         return false;
     };
 
-    RubyChildAnalyzer.isAtomicRubyElement = function (DOMelement) {
+    NodeInspector.isAtomicRubyElement = function (DOMelement) {
         return (DOMelement.nodeType !== 3) &&
             ((DOMelement.tagName.toLowerCase() === "rt") ||
             (DOMelement.tagName.toLowerCase() === "rb") ||
             (DOMelement.tagName.toLowerCase() === "rp"));
     };
 
-    RubyChildAnalyzer.isAtomicRubyTextElement = function (DOMelement) {
+    NodeInspector.isAtomicRubyTextElement = function (DOMelement) {
         return (DOMelement.nodeType !== 3) &&
             (DOMelement.tagName.toLowerCase() === "rt");
     };
 
-    RubyChildAnalyzer.isContainerRubyElement = function (DOMelement) {
+    NodeInspector.isContainerRubyElement = function (DOMelement) {
         return (DOMelement.nodeType !== 3) &&
             (DOMelement.tagName.toLowerCase() === "rtc");
     };
 
-    RubyChildAnalyzer.isNestedRubyElement = function (DOMelement) {
+    NodeInspector.isNestedRubyElement = function (DOMelement) {
         return (DOMelement.nodeType !== 3) &&
             (DOMelement.tagName.toLowerCase() === "ruby");
     };
 
-    RubyChildAnalyzer.isBadIE8ClosingTagNode = function (DOMelement) {
+    NodeInspector.isBadIE8ClosingTagNode = function (DOMelement) {
         // IE8 mishandles rb and rtc tags when reading HTML, creating empty RB nodes and empty nodes tagged "/RB"
         return (DOMelement.nodeType !== 3) &&
             ((DOMelement.tagName.toLowerCase() === "/rtc") ||
             (DOMelement.tagName.toLowerCase() === "/rb") ||
             (DOMelement.tagName.toLowerCase() === "/rbc"));
     };
-    RubyChildAnalyzer.isEmptyTextContainerNode = function (DOMelement) {
+
+    NodeInspector.isEmptyTextContainerNode = function (DOMelement) {
         // tests to see if the base node is empty but followed by a loose text node
         return (DOMelement.nodeType !== 3) &&
             (DOMelement.tagName.toLowerCase() === "rtc") &&
             (DOMelement.childNodes.length === 0);
     };
 
-    RubyChildAnalyzer.isElementWithTag = function (DOMelement, tagName) {
+    NodeInspector.isElementWithTag = function (DOMelement, tagName) {
         return (DOMelement.nodeType !== 3) &&
             (DOMelement.tagName.toLowerCase() === tagName);
     };
 
+
+    /************************************************
+    * RubyPreprocessor Class Definition
+    ************************************************/
 
     RubyPreprocessor.preprocessContainer = function (containerNode, rubyNode) {
         var children = containerNode.childNodes,
@@ -1068,13 +1085,13 @@
             j;
 
         for (i = 0; i < children.length; i++) {
-            if (RubyChildAnalyzer.isTextNode(children.item(i))) {
+            if (NodeInspector.isTextNode(children.item(i))) {
                 referenceNode = children.item(i).nextSibling;
-                newNode = RubyShim.wrapChildWithNewElement(children.item(i), "rt");
+                newNode = RubyDOMRebuilder.wrapChildWithNewElement(children.item(i), "rt");
                 containerNode.insertBefore(newNode, referenceNode);
-            } else if (RubyChildAnalyzer.isAtomicRubyTextElement(children.item(i))) {
-                RubyShim.flatten(children.item(i), containerNode);
-            } else if (RubyChildAnalyzer.isTextContainerDelimiter(children.item(i))) {
+            } else if (NodeInspector.isAtomicRubyTextElement(children.item(i))) {
+                RubyDOMRebuilder.flatten(children.item(i), containerNode);
+            } else if (NodeInspector.isTextContainerDelimiter(children.item(i))) {
                 for (j = children.length - 1; j >= i; j--) {
                     rubyNode.insertBefore(children.item(j), containerNode.nextSibling);
                 }
@@ -1082,70 +1099,69 @@
             }
         }
     };
+
     RubyPreprocessor.preprocess = function (rubyNode) {
         var children = rubyNode.childNodes,
             newNode,
             i;
         //
         for (i = 0; i < children.length; i++) {
-            // flatten node if necessary
-            if (RubyChildAnalyzer.isAtomicRubyElement(children.item(i))) {
-                RubyShim.flatten(children.item(i), rubyNode);
-            } else if (RubyChildAnalyzer.isContainerRubyElement(children.item(i))) {
+            // flatten phase
+            if (NodeInspector.isAtomicRubyElement(children.item(i))) {
+                RubyDOMRebuilder.flatten(children.item(i), rubyNode);
+            } else if (NodeInspector.isContainerRubyElement(children.item(i))) {
                 RubyPreprocessor.preprocessContainer(children.item(i), rubyNode);
             }
             // preprocess container elements
-            if (RubyChildAnalyzer.isNestedRubyElement(children.item(i))) {
+            if (NodeInspector.isNestedRubyElement(children.item(i))) {
                 RubyPreprocessor.preprocess(children.item(i));
-            } else if (RubyChildAnalyzer.isContainerRubyElement(children.item(i))) {
+            } else if (NodeInspector.isContainerRubyElement(children.item(i))) {
                 RubyPreprocessor.preprocessContainer(children.item(i));
             }
+
             // rebuild phase
-            if (RubyChildAnalyzer.isTextNode(children.item(i)) && (i === 0)) {
+            if (NodeInspector.isTextNode(children.item(i))) {
                 // implicit rb node
-                newNode = RubyShim.wrapChildWithNewElement(children.item(i), "rb");
-                rubyNode.insertBefore(newNode, rubyNode.firstChild);
-            } else if (RubyChildAnalyzer.isEmptyBaseNodeThenTextNode(children.item(i))) {
-                newNode = RubyShim.wrapChildWithNewElement(RubyShim.nextNonWhitespaceSibling(children.item(i)), "rb");
+                newNode = RubyDOMRebuilder.wrapChildWithNewElement(children.item(i), "rb");
+                rubyNode.insertBefore(newNode, children.item(i));
+            } else if (NodeInspector.isEmptyBaseNodeThenTextNode(children.item(i))) {
+                newNode = RubyDOMRebuilder.wrapChildWithNewElement(RubyDOMRebuilder.nextNonWhitespaceSibling(children.item(i)), "rb");
 //                while () {
                     // TODO keep adding nodes until you hit a bad end tag, or a whitelisted element type. Types include
                     // span, a, link,
 //                }
                 rubyNode.replaceChild(newNode, children.item(i)); //write over current rb node
-            } else if (RubyChildAnalyzer.isEmptyTextContainerNode(children.item(i))) {
+            } else if (NodeInspector.isEmptyTextContainerNode(children.item(i))) {
                 // empty rtc node, could be legitimately empty, or could be followed by rt nodes.
-                newNode = RubyShim.buildNewTextContainerNode(children.item(i));
+                newNode = RubyDOMRebuilder.buildNewTextContainerNode(children.item(i));
                 rubyNode.replaceChild(newNode, children.item(i));
-            } else if (RubyChildAnalyzer.isEmptyBaseContainerNode(children.item(i))) {
+            } else if (NodeInspector.isEmptyBaseContainerNode(children.item(i))) {
                 // empty rtc node, could be legitimately empty, or could be followed by rt nodes.
-                newNode = RubyShim.buildNewBaseContainerNode(rubyNode, children.item(i));
+                newNode = RubyDOMRebuilder.buildNewBaseContainerNode(rubyNode, children.item(i));
                 rubyNode.replaceChild(newNode, children.item(i));
-            } else if (RubyChildAnalyzer.isBadIE8ClosingTagNode(children.item(i))) {
+            } else if (NodeInspector.isBadIE8ClosingTagNode(children.item(i))) {
                 rubyNode.removeChild(children.item(i));
                 i--;
             }
         }
         return rubyNode;
     };
+
     rubyChildren = document.getElementsByTagName("ruby");
-//    console.log(rubyChildren);
     for (i = 0; i < rubyChildren.length; i++) {
         rubyNode = rubyChildren[i];
         rubyNode = RubyPreprocessor.preprocess(rubyNode);
     }
-//    console.log(rubyChildren);
+
     for (i = 0; i < rubyChildren.length; i++) {
         rubyNode = rubyChildren[i];
-        rubySegs = RubyProcessor.getDescriptor(rubyNode);
+        rubySegs = RubyDescriptorBuilder.getDescriptor(rubyNode);
         for (j = 0; j < rubySegs.length; j++) {
             SegmentProcessor.process(rubySegs[j]);
         }
         newRubyNode = SegmentProcessor.collapseIntoNode(rubySegs);
-        // finally, we need to calculate the layout of the ruby element itself
         rubyChildren[i].parentElement.replaceChild(newRubyNode, rubyChildren[i]);
         layout = new RubyLayoutManager(newRubyNode, rubySegs);
-
     }
-
     }()
 );
