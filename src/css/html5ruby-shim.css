@@ -1,0 +1,40 @@
+rb,
+rbc,
+rt,
+rtc {
+    white-space: nowrap;
+}
+
+rp {
+    display: none;
+}
+
+rtc {
+    display: block;
+    left: 0;
+    position: absolute;
+    ruby-position: above right; /* applies to test module */
+    text-align: center;
+    top: 0;
+}
+
+rtc + rtc {
+    bottom: 0;
+    left: 0;
+    ruby-position: below left; /* applies to testing module */
+    top: inherit;
+}
+
+rt {
+    display: inline-block;
+    font-size: 50%;
+    vertical-align: top;
+}
+
+ruby {
+    border: none;
+    display: inline-block;
+    position: relative;
+    ruby-align: center;
+    text-align: center;
+}

@@ -11,7 +11,11 @@ Works in:
 
 ## Usage
 
-Just html5ruby-shim.js load in your HTML code.
+Put the following lines in your page:
+
+`<link href="/path/to/html5ruby-shim.css" rel="stylesheet">`
+`<script src="/path/to/html5ruby-shim.js" type="text/javascript"></script>`
+
 
 ## Description
 
@@ -21,10 +25,15 @@ Firefox and Opera do not support it at all, while IE11 and Chrome only provide s
 
 ## Features
 
-Assuming correct ruby markup (according to the HTML5 standard), this library will **replace** each `<ruby>` element with a semantically corrected one. Cases handled include:
+Assuming correct ruby markup (according to the HTML5 standard), this library will **replace** each `<ruby>` element with a semantically corrected one, and handle the layout of the annotations.
 
-- Interleaved `<rb>` and `<rt>`
-- end tag ommission for `<rb>`, `<rt>`, `<rp>`, and `<rtc>` elements.
+Features this library provides include:
+
+- Support for annotations spanning multible base elements.
+- Correct parsing of code containing interleaved `<rb>` and `<rt>` tags.
+- Support for end tag ommission when using `<rb>`, `<rt>`, `<rp>`, and `<rtc>` elements.
+
+## Examples
 
 To put it more simply, if you want a 1 above A, 2 above B, and a 3 above C, you can now do this:
 
@@ -41,8 +50,5 @@ And you will still end up with a correct DOM and an element that displays proper
 
 ## Known Issues
 
-* Text outside of the ruby element not aligning vertically with ruby bases. 
-* Currently annotations spanning multiple elements is not working
 * `span` elements within `rb` elements not working in IE8
 * Text directly inside `rtc` nodes treated as `rb` nodes rather than `rt` nodes in Safari 5 and IE8
-This library currently does not deal with `<span>` elements within `<rb>` elements in IE8.
